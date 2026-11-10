@@ -1,0 +1,11 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["NODE_ENV", "DATABASE_URL", "ANTHROPIC_API_KEY", "QUIRE_*"],
+  "tasks": {
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**", "!.next/cache/**"] },
+    "dev": { "cache": false, "persistent": true },
+    "lint": {},
+    "typecheck": { "dependsOn": ["^typecheck"] },
+    "test": {}
+  }
+}
