@@ -26,25 +26,39 @@ function words(text: string): string[] {
 export function packKeywordBoxes(scored: KeywordScore[], title: string, subtitle: string | null): KeywordBox[] {
   const covered = new Set(words(`${title} ${subtitle ?? ''}`).filter((word) => !STOP_WORDS.has(word)));
   const used = new Set<string>();
-  const phrases: string[] = [];
+  const packed: Array<{ keyword: string; fragment: string }> = [];
   for (const { keyword } of [...scored].sort((left, right) => right.score - left.score)) {
     if (BANNED_TERMS.some((term) => keyword.includes(term))) continue;
     const fresh = words(keyword).filter((word) => !covered.has(word) && !used.has(word) && !STOP_WORDS.has(word));
     if (fresh.length === 0) continue;
-    const phrase = fresh.join(' ');
-    if (phrase.length > KDP_KEYWORD_BOX_CHARS) continue;
+    const fragment = fresh.join(' ');
+    if (fragment.length > KDP_KEYWORD_BOX_CHARS) continue;
     fresh.forEach((word) => used.add(word));
-    phrases.push(phrase);
+    packed.push({ keyword, fragment });
   }
 
+  // Box text holds only the new words. Phrases keep the full search phrase, which is what gets rank-tracked.
   const boxes: KeywordBox[] = Array.from({ length: KDP_KEYWORD_BOXES }, (_, index) => ({ index, text: '', phrases: [] }));
-  for (const phrase of phrases) {
-    const box = boxes.find((candidate) => (candidate.text ? candidate.text.length + 1 : 0) + phrase.length <= KDP_KEYWORD_BOX_CHARS);
+  for (const { keyword, fragment } of packed) {
+    const box = boxes.find((candidate) => (candidate.text ? candidate.text.length + 1 : 0) + fragment.length <= KDP_KEYWORD_BOX_CHARS);
     if (!box) break;
-    box.text = box.text ? `${box.text} ${phrase}` : phrase;
-    box.phrases.push(phrase);
+    box.text = box.text ? `${box.text} ${fragment}` : fragment;
+    box.phrases.push(keyword);
   }
   return boxes;
+}
+
+/** Rebuild one box's text from its phrases: unique words not already in the title or subtitle, cut to 50 characters. */
+export function keywordBoxText(phrases: string[], title: string, subtitle: string | null): string {
+  const covered = new Set(words(`${title} ${subtitle ?? ''}`));
+  const unique = [...new Set(phrases.flatMap(words))].filter((word) => !covered.has(word) && !STOP_WORDS.has(word));
+  let text = '';
+  for (const word of unique) {
+    const next = text ? `${text} ${word}` : word;
+    if (next.length > KDP_KEYWORD_BOX_CHARS) break;
+    text = next;
+  }
+  return text;
 }
 
 export interface MetadataIssue {

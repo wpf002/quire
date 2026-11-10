@@ -6,6 +6,7 @@ import {
   bsrForDailySales,
   categoryFit,
   demandScore,
+  keywordBoxText,
   ebookRoyaltyCents,
   estimateDailySales,
   packKeywordBoxes,
@@ -86,6 +87,23 @@ describe('keywords', () => {
     expect(text).not.toContain('unlimited');
     expect(boxes).toHaveLength(7);
     expect(boxes.every((box) => box.text.length <= 50)).toBe(true);
+  });
+
+  it('tracks the full search phrase while the box holds only new words', () => {
+    const boxes = packKeywordBoxes(
+      [
+        { keyword: 'fantasy romance', score: 0.9, demand: 1, competition: 0.2, resultCount: 1, topSalesPerDay: 1, source: 's' },
+        { keyword: 'dark fantasy romance', score: 0.8, demand: 1, competition: 0.2, resultCount: 1, topSalesPerDay: 1, source: 's' },
+      ],
+      'The Salt Road',
+      null,
+    );
+    expect(boxes[0]!.text).toBe('fantasy romance dark');
+    expect(boxes[0]!.phrases).toEqual(['fantasy romance', 'dark fantasy romance']);
+  });
+
+  it('rebuilds box text from phrases without title words or repeats', () => {
+    expect(keywordBoxText(['dark fantasy romance', 'salt flats fantasy'], 'The Salt Road', null)).toBe('dark fantasy romance flats');
   });
 
   it('flags over-length metadata', () => {

@@ -12,6 +12,7 @@ import type { AppContext } from '../context';
 import { fromJson, toJson } from '../json';
 import { enqueue } from '../queue';
 import { advanceStage } from './books';
+import { KDP_CATEGORY_SLOTS } from './metadata';
 import { requireManuscript } from './manuscripts';
 
 export const DiscoveryRequestSchema = z.object({
@@ -23,7 +24,6 @@ export type DiscoveryRequest = z.infer<typeof DiscoveryRequestSchema>;
 
 const DiscoveryJobSchema = z.object({ bookId: z.string(), request: DiscoveryRequestSchema });
 const CANDIDATE_LIMIT = 40;
-const KDP_CATEGORY_SLOTS = 3;
 // EPUB size estimate: ~6 bytes per word of XHTML plus fonts and packaging.
 const EPUB_BYTES_PER_WORD = 6;
 const EPUB_OVERHEAD_MB = 0.3;
@@ -45,9 +45,13 @@ export async function runDiscoveryJob(context: AppContext, payload: unknown): Pr
   const ebook = recommendEbookPrice({ compMedianCents: result.compMedianPriceCents, fileSizeMb, seriesStarter: book.seriesStarter });
   const paperback = recommendPaperbackPrice({ pages, compMedianCents: result.compMedianPriceCents });
 
+  const pickedCategories = result.categories.filter((category) => category.fit === 'winnable' || category.fit === 'stretch').slice(0, KDP_CATEGORY_SLOTS);
+  const categories = pickedCategories.map((category) => category.path);
+  const filledBoxes = result.boxes.filter((box) => box.text.length > 0).length;
+
   const payloads: Array<{ payload: RecommendationPayload; rationale: string }> = [
-    { payload: { kind: 'keywords', boxes: result.boxes }, rationale: `${result.boxes.length} boxes packed from ${result.keywords.length} scored phrases.` },
-    { payload: { kind: 'categories', categories: result.categories }, rationale: `Ranked for ~${request.expectedDailySales} sales a day.` },
+    { payload: { kind: 'keywords', boxes: result.boxes }, rationale: `${filledBoxes} of ${result.boxes.length} boxes packed from ${result.keywords.length} scored phrases.` },
+    { payload: { kind: 'categories', categories: pickedCategories }, rationale: `Ranked for ~${request.expectedDailySales} sales a day.` },
     { payload: { kind: 'price-ebook', pricing: ebook }, rationale: ebook.rationale },
     { payload: { kind: 'price-paperback', pricing: paperback }, rationale: paperback.rationale },
   ];
@@ -55,7 +59,6 @@ export async function runDiscoveryJob(context: AppContext, payload: unknown): Pr
   const live = await context.prisma.metadataVersion.findFirst({ where: { bookId, appliedAt: { not: null } }, orderBy: { version: 'desc' } });
   const latest = await context.prisma.metadataVersion.findFirst({ where: { bookId }, orderBy: { version: 'desc' }, select: { version: true } });
   const blurb = book.blurb ? fromJson<Blurb>(book.blurb) : null;
-  const categories = result.categories.filter((category) => category.fit === 'winnable' || category.fit === 'stretch').slice(0, KDP_CATEGORY_SLOTS).map((category) => category.path);
 
   await context.prisma.$transaction(async (tx) => {
     // A fresh run replaces open launch recommendations from the last run.

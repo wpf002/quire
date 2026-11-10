@@ -1,7 +1,6 @@
 import { type ExportTarget, type TrimSize, newId } from '@quire/core';
 import { type ChecklistItem } from '@quire/compliance';
 import { type ExportOptions, exportEpub, exportPdf, preflight } from '@quire/export';
-import { estimatePrintPages } from '@quire/core';
 import type { AppContext } from '../context';
 import { conflict } from '../errors';
 import { fromJson, toJson } from '../json';
@@ -38,7 +37,8 @@ export async function createExport(context: AppContext, bookId: string, format: 
   } else {
     buffer = await exportEpub(manuscript, options);
   }
-  const checks = preflight(manuscript, options, pageCount ?? estimatePrintPages(manuscript));
+  // Page limits are a print rule. EPUB gets no page check.
+  const checks = preflight(manuscript, options, pageCount);
   const id = newId('exp');
   const storagePath = await context.storage.put(`exports/${bookId}/${id}.${format}`, buffer);
   const row = await context.prisma.export.create({

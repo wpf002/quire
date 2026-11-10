@@ -1,5 +1,5 @@
 import { newId } from '@quire/core';
-import { type MetadataIssue, type RecommendationPayload, validateMetadata } from '@quire/discovery';
+import { keywordBoxText, type MetadataIssue, type RecommendationPayload, validateMetadata } from '@quire/discovery';
 import type { MetadataVersion, PrismaClient } from '@quire/db';
 import { MAX_TRACKED_KEYWORDS } from '@quire/tracking';
 import { z } from 'zod';
@@ -121,7 +121,7 @@ function applyPayload(version: MetadataVersion, payload: RecommendationPayload) 
       if (!box) throw badRequest('Keyword box no longer exists');
       const nextBox = box.map((phrase) => (phrase === payload.remove ? payload.add : phrase));
       phrases[payload.boxIndex] = nextBox;
-      fields.keywordBoxes[payload.boxIndex] = nextBox.join(' ').slice(0, 50);
+      fields.keywordBoxes[payload.boxIndex] = keywordBoxText(nextBox, version.title, version.subtitle);
       fields.boxPhrases = toJson(phrases);
       return fields;
     }
@@ -138,14 +138,47 @@ function applyPayload(version: MetadataVersion, payload: RecommendationPayload) 
   }
 }
 
-/** Apply a re-optimization as a new live version, linked to the recommendation so its outcome can be measured. */
+export const KDP_CATEGORY_SLOTS = 3;
+type LaunchPayload = Extract<RecommendationPayload, { kind: 'keywords' | 'categories' | 'price-ebook' | 'price-paperback' }>;
+
+function isLaunchPayload(payload: RecommendationPayload): payload is LaunchPayload {
+  return payload.kind === 'keywords' || payload.kind === 'categories' || payload.kind === 'price-ebook' || payload.kind === 'price-paperback';
+}
+
+function launchPatch(payload: LaunchPayload): z.infer<typeof DraftPatchSchema> {
+  switch (payload.kind) {
+    case 'keywords':
+      return { keywordBoxes: payload.boxes.map((box) => box.text) };
+    case 'categories':
+      return { categories: payload.categories.slice(0, KDP_CATEGORY_SLOTS).map((category) => category.path) };
+    case 'price-ebook':
+      return { ebookPriceCents: payload.pricing.recommendedCents };
+    case 'price-paperback':
+      return { paperbackPriceCents: payload.pricing.recommendedCents };
+  }
+}
+
+/** Launch recommendations (keywords, categories, prices) edit the draft. They go live when the draft is published. */
+async function applyLaunchRecommendation(context: AppContext, bookId: string, recommendationId: string, payload: LaunchPayload): Promise<MetadataVersion> {
+  const draft = await patchDraft(context, bookId, launchPatch(payload));
+  const updated =
+    payload.kind === 'keywords'
+      ? await context.prisma.metadataVersion.update({ where: { id: draft.id }, data: { boxPhrases: toJson(payload.boxes.map((box) => box.phrases)) } })
+      : draft;
+  await context.prisma.recommendation.update({ where: { id: recommendationId }, data: { status: 'applied', appliedAt: context.clock() } });
+  return updated;
+}
+
+/** Apply a recommendation. Re-optimizations become a new live version, linked to the recommendation so its outcome can be measured. */
 export async function applyRecommendation(context: AppContext, bookId: string, recommendationId: string) {
   const recommendation = await context.prisma.recommendation.findFirst({ where: { id: recommendationId, bookId } });
   if (!recommendation) throw badRequest('Recommendation not found');
   if (recommendation.status !== 'open') throw conflict('Recommendation already decided');
+  const payload = fromJson<RecommendationPayload>(recommendation.payload);
+  if (isLaunchPayload(payload)) return applyLaunchRecommendation(context, bookId, recommendationId, payload);
   const live = await liveVersion(context.prisma, bookId);
   if (!live) throw conflict('Publish the book before applying re-optimizations');
-  const fields = applyPayload(live, fromJson<RecommendationPayload>(recommendation.payload));
+  const fields = applyPayload(live, payload);
   const now = context.clock();
   const book = await context.prisma.book.findUniqueOrThrow({ where: { id: bookId }, include: { user: { select: { plan: true } } } });
   const version = await context.prisma.$transaction(async (tx) => {

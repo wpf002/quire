@@ -132,12 +132,23 @@ describe('self-serve flow', () => {
     expect(draft.keywordBoxes.length).toBe(7);
     expect(draft.categories.length).toBeGreaterThan(0);
 
+    // Regression: applying a launch rec before publish edits the draft instead of failing with 409.
+    const discovery = (await client.request('GET', `/books/${bookId}/discovery`)).json();
+    const ebookRec = (discovery.recommendations as Array<{ id: string; kind: string; payload: { pricing: { recommendedCents: number } } }>).find((rec) => rec.kind === 'price-ebook')!;
+    await client.request('PATCH', `/books/${bookId}/metadata/draft`, { ebookPriceCents: 199 });
+    expect((await client.request('POST', `/books/${bookId}/recommendations/${ebookRec.id}/apply`)).status).toBe(200);
+    const afterApply = (await client.request('GET', `/books/${bookId}/metadata`)).json().draft as { ebookPriceCents: number };
+    expect(afterApply.ebookPriceCents).toBe(ebookRec.payload.pricing.recommendedCents);
+
     const patched = await client.request('PATCH', `/books/${bookId}/metadata/draft`, { description: 'A caravan crosses the salt flats.' });
     expect(patched.status).toBe(200);
 
     const exported = await client.request('POST', `/books/${bookId}/exports`, { format: 'epub' });
     expect(exported.status).toBe(201);
     const exportId = (exported.json().export as { id: string }).id;
+    // Regression: a short manuscript must not fail the print page minimum on an EPUB.
+    const preflightIds = (exported.json().export as { preflight: Array<{ id: string }> }).preflight.map((check) => check.id);
+    expect(preflightIds).not.toContain('pages');
     const download = await client.request('GET', `/books/${bookId}/exports/${exportId}/download`);
     expect(download.status).toBe(200);
     expect(download.raw.headers['content-disposition']).toBe('attachment; filename="the-salt-road-kdp.epub"');
