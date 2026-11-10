@@ -1,0 +1,14 @@
+{
+  "name": "@quire/core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run"
+  },
+  "dependencies": { "zod": "3.25.76" },
+  "optionalDependencies": { "@flint/core": "link:../../../flint/packages/core" }
+}

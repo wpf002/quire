@@ -1,0 +1,19 @@
+{
+  "name": "@quire/export",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource/eb-garamond": "5.2.7",
+    "@quire/core": "workspace:*",
+    "jszip": "3.10.1",
+    "pdfkit": "0.17.2"
+  },
+  "devDependencies": { "@types/pdfkit": "0.17.3" }
+}
