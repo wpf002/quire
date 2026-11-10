@@ -33,6 +33,12 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.18.6)
 
+  packages/compliance:
+    dependencies:
+      '@quire/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/core:
     dependencies:
       zod:
@@ -42,6 +48,15 @@ importers:
       '@flint/core':
         specifier: link:../../../flint/packages/core
         version: link:../../../flint/packages/core
+
+  packages/discovery:
+    dependencies:
+      '@quire/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
 
   packages/editing:
     dependencies:

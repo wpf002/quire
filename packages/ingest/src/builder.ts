@@ -83,7 +83,7 @@ function trimSceneBreaks(blocks: Block[]): Block[] {
 export function normalizeRuns(runs: Run[]): Run[] {
   const merged: Run[] = [];
   for (const run of runs) {
-    const text = run.text.replace(/[\t\r\n ]+/g, ' ');
+    const text = run.text.replace(/[\t\r\n\u00A0]+/g, ' ');
     if (!text) continue;
     const previous = merged.at(-1);
     if (previous && Boolean(previous.em) === Boolean(run.em) && Boolean(previous.strong) === Boolean(run.strong)) {

@@ -10,7 +10,8 @@ export interface PreflightCheck {
 }
 
 // Characters outside the embedded Latin subset render as missing glyphs.
-const OUTSIDE_LATIN_PATTERN = /[^\u0000-ɏ -⁯₠-⃏℀-⅏]/u;
+// eslint-disable-next-line no-control-regex -- the range starts at NUL on purpose: everything in Basic Latin is covered.
+const OUTSIDE_LATIN_PATTERN = /[^\u0000-\u024F\u2000-\u206F\u20A0-\u20CF\u2100-\u214F]/u;
 const ISBN_13_PATTERN = /^97[89]\d{10}$/;
 
 export function preflight(manuscript: Manuscript, options: ExportOptions, pageCount: number | null): PreflightCheck[] {
