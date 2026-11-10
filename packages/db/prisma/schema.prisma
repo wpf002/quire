@@ -1,0 +1,347 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  starter
+  author
+  press
+}
+
+enum BookStage {
+  upload
+  edit
+  comply
+  metadata
+  export
+  publish
+  track
+}
+
+enum PassKind {
+  copyedit
+  proofread
+  structural
+}
+
+enum JobStatus {
+  queued
+  running
+  done
+  failed
+}
+
+enum EditStatus {
+  pending
+  accepted
+  rejected
+}
+
+enum AiRole {
+  none
+  assisted
+  generated
+}
+
+enum RecommendationStatus {
+  open
+  applied
+  dismissed
+}
+
+model User {
+  id                 String   @id
+  email              String   @unique
+  passwordHash       String
+  name               String
+  plan               Plan     @default(starter)
+  /// Per-account daily AI spend cap in integer cents. Calls that would exceed it are refused.
+  spendCapCentsDaily Int      @default(300)
+  createdAt          DateTime @default(now())
+
+  sessions Session[]
+  books    Book[]
+  spend    SpendEntry[]
+  jobs     Job[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  /// SHA-256 of the session token. The raw token only ever lives in the cookie.
+  tokenHash String   @unique
+  csrfToken String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Book {
+  id            String    @id
+  userId        String
+  title         String
+  subtitle      String?
+  author        String
+  genre         String    @default("")
+  stage         BookStage @default(upload)
+  trimSize      String    @default("6x9")
+  isbn          String?
+  aboutAuthor   String?
+  dedication    String?
+  seriesStarter Boolean   @default(false)
+  asin          String?
+  /// { hook, description, backCover } once generated.
+  blurb         Json?
+  /// The author's answers about AI use outside Quire (images, translation, outside text).
+  declaration   Json?
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manuscripts      ManuscriptVersion[]
+  uploads          Upload[]
+  passes           Pass[]
+  edits            Edit[]
+  compliance       ComplianceReport[]
+  discoveryRuns    DiscoveryRun[]
+  recommendations  Recommendation[]
+  metadataVersions MetadataVersion[]
+  trackedKeywords  TrackedKeyword[]
+  rankObservations RankObservation[]
+  bsrObservations  BsrObservation[]
+  exports          Export[]
+  spend            SpendEntry[]
+
+  @@index([userId])
+}
+
+model ManuscriptVersion {
+  id        String   @id
+  bookId    String
+  version   Int
+  content   Json
+  wordCount Int
+  /// What produced this version: "upload" or "edits".
+  source    String
+  createdAt DateTime @default(now())
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, version])
+}
+
+model Upload {
+  id          String   @id
+  bookId      String
+  filename    String
+  format      String
+  bytes       Int
+  storagePath String
+  createdAt   DateTime @default(now())
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId])
+}
+
+model Pass {
+  id                 String    @id
+  bookId             String
+  kind               PassKind
+  status             JobStatus @default(queued)
+  manuscriptVersion  Int
+  model              String?
+  modelSkippedReason String?
+  /// Content-touch log entry for this pass.
+  touch              Json?
+  /// Structural notes, each labeled specific or generic.
+  notes              Json?
+  costCents          Int       @default(0)
+  error              String?
+  createdAt          DateTime  @default(now())
+  finishedAt         DateTime?
+  book               Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  edits              Edit[]
+
+  @@index([bookId, createdAt])
+}
+
+model Edit {
+  id            String     @id
+  passId        String
+  bookId        String
+  chapterId     String
+  blockId       String
+  before        String
+  after         String
+  reason        String
+  rule          String?
+  source        String
+  aiRole        AiRole
+  status        EditStatus @default(pending)
+  authorRevised Boolean    @default(false)
+  decidedAt     DateTime?
+  pass          Pass       @relation(fields: [passId], references: [id], onDelete: Cascade)
+  book          Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, status])
+  @@index([passId])
+}
+
+model ComplianceReport {
+  id            String   @id
+  bookId        String
+  disclosure    Json
+  checklist     Json
+  /// Checklist item ids the author confirmed.
+  confirmations String[]
+  createdAt     DateTime @default(now())
+  book          Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, createdAt])
+}
+
+model DiscoveryRun {
+  id        String   @id
+  bookId    String
+  input     Json
+  result    Json
+  sources   String[]
+  createdAt DateTime @default(now())
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, createdAt])
+}
+
+model Recommendation {
+  id          String               @id
+  bookId      String
+  kind        String
+  payload     Json
+  rationale   String
+  dataSources String[]
+  status      RecommendationStatus @default(open)
+  createdAt   DateTime             @default(now())
+  appliedAt   DateTime?
+  /// Empty until tracking measures the before/after windows.
+  outcome     Json?
+  outcomeAt   DateTime?
+  book        Book                 @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  versions    MetadataVersion[]
+
+  @@index([bookId, createdAt])
+}
+
+model MetadataVersion {
+  id                  String          @id
+  bookId              String
+  version             Int
+  title               String
+  subtitle            String?
+  description         String
+  keywordBoxes        String[]
+  /// Phrases packed into each box, for per-phrase rank tracking.
+  boxPhrases          Json
+  categories          String[]
+  ebookPriceCents     Int?
+  paperbackPriceCents Int?
+  /// When the author marked this version live on KDP. Null while it's a draft.
+  appliedAt           DateTime?
+  recommendationId    String?
+  createdAt           DateTime        @default(now())
+  book                Book            @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  recommendation      Recommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
+
+  @@unique([bookId, version])
+}
+
+model TrackedKeyword {
+  id        String   @id
+  bookId    String
+  keyword   String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, keyword])
+}
+
+model RankObservation {
+  id         String   @id
+  bookId     String
+  keyword    String
+  rank       Int?
+  provider   String
+  observedAt DateTime
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, keyword, observedAt])
+  @@index([bookId, observedAt])
+}
+
+model BsrObservation {
+  id         String   @id
+  bookId     String
+  bsr        Int?
+  provider   String
+  observedAt DateTime
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, observedAt])
+}
+
+model Export {
+  id          String   @id
+  bookId      String
+  format      String
+  target      String
+  trimSize    String
+  storagePath String
+  bytes       Int
+  pageCount   Int?
+  preflight   Json
+  createdAt   DateTime @default(now())
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, createdAt])
+}
+
+model SpendEntry {
+  id        String   @id
+  userId    String
+  bookId    String?
+  purpose   String
+  model     String
+  costCents Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book      Book?    @relation(fields: [bookId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+model Job {
+  id          String    @id
+  userId      String?
+  type        String
+  payload     Json
+  status      JobStatus @default(queued)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  runAt       DateTime  @default(now())
+  lockedAt    DateTime?
+  lockedBy    String?
+  error       String?
+  createdAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAt])
+}
