@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LandingProof } from '@/components/landing-proof';
 import { Wordmark } from '@/components/wordmark';
 
 const STAGES = [
@@ -15,24 +16,81 @@ const TOOLS = ['Quire', 'Publisher Rocket', 'Atticus', 'Vellum', 'Rank Trackers'
 type Support = 'yes' | 'partial' | 'no';
 
 const COMPARISON: Array<{ feature: string; support: Record<(typeof TOOLS)[number], Support> }> = [
-  { feature: 'Editing Passes', support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' } },
-  { feature: 'KDP AI Disclosure', support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' } },
-  { feature: 'Packed Keyword Boxes', support: { Quire: 'yes', 'Publisher Rocket': 'partial', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' } },
-  { feature: 'Category Fit', support: { Quire: 'yes', 'Publisher Rocket': 'yes', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' } },
-  { feature: 'EPUB and Print PDF', support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'yes', Vellum: 'yes', 'Rank Trackers': 'no' } },
-  { feature: 'Keyword Rank Tracking', support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'yes' } },
-  { feature: 'Change Attribution', support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'partial' } },
-  { feature: 'Re-Optimize Recs', support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' } },
-  { feature: 'Runs in the Browser', support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'yes', Vellum: 'no', 'Rank Trackers': 'yes' } },
+  {
+    feature: 'Editing Passes',
+    support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' },
+  },
+  {
+    feature: 'KDP AI Disclosure',
+    support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' },
+  },
+  {
+    feature: 'Packed Keyword Boxes',
+    support: {
+      Quire: 'yes',
+      'Publisher Rocket': 'partial',
+      Atticus: 'no',
+      Vellum: 'no',
+      'Rank Trackers': 'no',
+    },
+  },
+  {
+    feature: 'Category Fit',
+    support: { Quire: 'yes', 'Publisher Rocket': 'yes', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' },
+  },
+  {
+    feature: 'EPUB and Print PDF',
+    support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'yes', Vellum: 'yes', 'Rank Trackers': 'no' },
+  },
+  {
+    feature: 'Keyword Rank Tracking',
+    support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'yes' },
+  },
+  {
+    feature: 'Change Attribution',
+    support: {
+      Quire: 'yes',
+      'Publisher Rocket': 'no',
+      Atticus: 'no',
+      Vellum: 'no',
+      'Rank Trackers': 'partial',
+    },
+  },
+  {
+    feature: 'Re-Optimize Recs',
+    support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'no', Vellum: 'no', 'Rank Trackers': 'no' },
+  },
+  {
+    feature: 'Runs in the Browser',
+    support: { Quire: 'yes', 'Publisher Rocket': 'no', Atticus: 'yes', Vellum: 'no', 'Rank Trackers': 'yes' },
+  },
 ];
 
 const SUPPORT_MARK: Record<Support, string> = { yes: '●', partial: '◐', no: '—' };
 const SUPPORT_LABEL: Record<Support, string> = { yes: 'Yes', partial: 'Partial', no: 'No' };
 
 const PLANS = [
-  { name: 'Starter', price: '$0', books: '1 book', cap: '$1 AI spend a day', keywords: '25 tracked keywords' },
-  { name: 'Author', price: '$19', books: '5 books', cap: '$5 AI spend a day', keywords: '150 tracked keywords per book' },
-  { name: 'Press', price: '$49', books: '25 books', cap: '$20 AI spend a day', keywords: '500 tracked keywords per book' },
+  {
+    name: 'Starter',
+    price: '$0',
+    books: '1 book',
+    cap: '$1 AI spend a day',
+    keywords: '25 tracked keywords',
+  },
+  {
+    name: 'Author',
+    price: '$19',
+    books: '5 books',
+    cap: '$5 AI spend a day',
+    keywords: '150 tracked keywords per book',
+  },
+  {
+    name: 'Press',
+    price: '$49',
+    books: '25 books',
+    cap: '$20 AI spend a day',
+    keywords: '500 tracked keywords per book',
+  },
 ];
 
 export default function LandingPage() {
@@ -51,19 +109,25 @@ export default function LandingPage() {
       </header>
 
       <section className="hero">
-        <p className="eyebrow">For Self-Published Authors</p>
-        <h1>
-          From finished draft to a <em>ranked</em> listing.
-        </h1>
-        <p className="hero-lede">Edit, disclose, list, export and track one book in one workspace. Each listing change is measured against the rank it produced.</p>
-        <div className="btn-row">
-          <Link className="btn btn-primary btn-large" href="/signup">
-            Start Free
-          </Link>
-          <a className="btn btn-large" href="#compare">
-            Compare Tools
-          </a>
+        <div className="hero-copy">
+          <p className="eyebrow">For Self-Published Authors</p>
+          <h1>
+            From finished draft to a <em>ranked</em> listing.
+          </h1>
+          <p className="hero-lede">
+            Edit, disclose, list, export and track one book in one workspace. Each listing change is measured
+            against the rank it produced.
+          </p>
+          <div className="btn-row">
+            <Link className="btn btn-primary btn-large" href="/signup">
+              Start Free
+            </Link>
+            <a className="btn btn-large" href="#compare">
+              Compare Tools
+            </a>
+          </div>
         </div>
+        <LandingProof />
       </section>
 
       <section className="pipeline" aria-label="Pipeline">
@@ -102,7 +166,11 @@ export default function LandingPage() {
                   {TOOLS.map((tool) => {
                     const support = row.support[tool];
                     return (
-                      <td key={tool} className={`compare-cell ${support}${tool === 'Quire' ? ' compare-us' : ''}`} title={SUPPORT_LABEL[support]}>
+                      <td
+                        key={tool}
+                        className={`compare-cell ${support}${tool === 'Quire' ? ' compare-us' : ''}`}
+                        title={SUPPORT_LABEL[support]}
+                      >
                         <span aria-label={SUPPORT_LABEL[support]}>{SUPPORT_MARK[support]}</span>
                       </td>
                     );

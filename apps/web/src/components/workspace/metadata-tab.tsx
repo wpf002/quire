@@ -375,7 +375,7 @@ function CategoryFit({ categories, picked, onToggle }: { categories: CategoryFit
                   </td>
                   <td className="right num">{count(category.bsrFirst)}</td>
                   <td className="right num">{count(category.bsrTenth)}</td>
-                  <td className="right num">{category.salesForTopTen.toFixed(1)}</td>
+                  <td className="right num">{Math.max(1, Math.round(category.salesForTopTen))}</td>
                   <td className="right">
                     <button type="button" className="btn btn-ghost btn-small" disabled={!on && picked.length >= CATEGORY_SLOTS} onClick={() => onToggle(category.path)}>
                       {on ? 'Remove' : 'Pick'}

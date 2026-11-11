@@ -1665,29 +1665,58 @@ textarea {
 }
 
 .trim-preview {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-4);
-  height: 210px;
+  display: grid;
+  place-items: end center;
 }
 
 .trim-page {
-  display: grid;
-  place-items: end center;
-  padding-bottom: var(--space-2);
+  padding: 9% 11%;
+  overflow: hidden;
   border: 1px solid var(--border-strong);
   border-radius: 1px 3px 3px 1px;
-  background: var(--paper-sunk);
-  color: var(--faint);
-  font-size: 11px;
-  transition: all 200ms var(--ease);
+  background: var(--paper-raised);
+  box-shadow: 4px 4px 0 var(--border);
+  transition:
+    width 200ms var(--ease),
+    height 200ms var(--ease);
 }
 
-.trim-page.current {
-  border-color: var(--ink-soft);
-  background: var(--paper-raised);
+/* Scaled-down typeset page; the 7.5px text stands in for the real 11pt body at preview scale. */
+.trim-type {
+  font-family: var(--font-text), serif;
+  font-size: 7.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  text-align: justify;
+  hyphens: auto;
+}
+
+.trim-type p {
+  margin: 0;
+  text-indent: 1.4em;
+}
+
+.trim-type .trim-chapter {
+  margin: 22% 0 14%;
+  font-family: var(--font-display), serif;
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+  text-indent: 0;
   color: var(--ink);
-  box-shadow: 4px 4px 0 var(--border);
+}
+
+.trim-type .trim-first {
+  text-indent: 0;
+}
+
+.trim-type .trim-first::first-letter {
+  float: left;
+  margin: 1px 2px 0 0;
+  font-family: var(--font-display), serif;
+  font-size: 23px;
+  line-height: 0.85;
+  color: var(--accent);
 }
 
 .exports {
@@ -1939,10 +1968,131 @@ textarea {
 
 .hero {
   display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) 0;
+}
+
+.hero-copy {
+  display: grid;
   justify-items: start;
   gap: var(--space-5);
-  max-width: 820px;
-  padding: var(--space-9) 0 var(--space-8);
+}
+
+.proof {
+  position: relative;
+  margin: 0;
+  padding: 0 0 var(--space-8) var(--space-6);
+}
+
+.proof-page {
+  padding: var(--space-7) var(--space-7) var(--space-6);
+  background: var(--paper-raised);
+  border: 1px solid var(--border);
+  font-family: var(--font-text), serif;
+  color: var(--ink-soft);
+  transform: rotate(-1.5deg);
+}
+
+.proof-chapter {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.proof-title {
+  margin: var(--space-2) 0 var(--space-5);
+  font-family: var(--font-display), serif;
+  font-size: var(--text-lg);
+  font-style: italic;
+  text-align: center;
+}
+
+.proof-body {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.proof-indent {
+  text-indent: 1.5em;
+}
+
+.proof-drop {
+  float: left;
+  margin: 2px var(--space-2) 0 0;
+  font-family: var(--font-display), serif;
+  font-size: 52px;
+  line-height: 0.85;
+  color: var(--accent);
+}
+
+.proof-folio {
+  margin: var(--space-5) 0 0;
+  color: var(--faint);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.proof-card {
+  position: absolute;
+  right: calc(-1 * var(--space-4));
+  bottom: 0;
+  width: 300px;
+  padding: var(--space-4);
+  background: var(--paper);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgb(30 27 24 / 0.12);
+}
+
+.proof-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.proof-delta {
+  margin: var(--space-2) 0 var(--space-3);
+  font-family: var(--font-display), serif;
+  font-size: var(--text-xl);
+  color: var(--accent);
+}
+
+.proof-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.proof-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.proof-change {
+  stroke: var(--gilt);
+  stroke-dasharray: 3 3;
+}
+
+.proof-change-label {
+  fill: var(--gilt);
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+}
+
+.proof-foot {
+  margin: var(--space-2) 0 0;
 }
 
 .hero h1 {
@@ -2086,6 +2236,14 @@ textarea {
 }
 
 @media (max-width: 1000px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .proof {
+    max-width: 520px;
+  }
+
   .pipeline ol {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2102,6 +2260,17 @@ textarea {
 @media (max-width: 700px) {
   .hero h1 {
     font-size: var(--text-2xl);
+  }
+
+  .proof {
+    padding: 0 0 var(--space-4);
+  }
+
+  .proof-card {
+    position: relative;
+    right: auto;
+    width: auto;
+    margin-top: calc(-1 * var(--space-6));
   }
 
   .stats,
