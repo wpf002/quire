@@ -27,7 +27,8 @@ export async function observeDay(context: AppContext, book: Book, at: Date, opti
   const live = await liveVersion(context.prisma, book.id, at);
   if (!live || !book.publishedAt) return false;
   const already = await context.prisma.bsrObservation.findUnique({ where: { bookId_observedAt: { bookId: book.id, observedAt: day } } });
-  if (already && !options.replace) return false;
+  // A day recorded by a different provider gets overwritten, so one series never mixes sources.
+  if (already && already.provider === context.ranks.name && !options.replace) return false;
   const keywords = await context.prisma.trackedKeyword.findMany({ where: { bookId: book.id, active: true, createdAt: { lte: at } }, select: { keyword: true } });
   // Ranking momentum dates from launch, not from each later metadata edit.
   const snapshot = await context.ranks.observe(
@@ -84,8 +85,8 @@ export async function attributeOutcomes(context: AppContext, bookId: string, now
   if (pending.length === 0) return 0;
   const since = new Date(now.getTime() - HISTORY_DAYS * DAY_MS);
   const [ranks, bsr] = await Promise.all([
-    context.prisma.rankObservation.findMany({ where: { bookId, observedAt: { gte: since } }, select: { keyword: true, rank: true, observedAt: true } }),
-    context.prisma.bsrObservation.findMany({ where: { bookId, observedAt: { gte: since } }, select: { bsr: true, observedAt: true } }),
+    context.prisma.rankObservation.findMany({ where: { bookId, provider: context.ranks.name, observedAt: { gte: since } }, select: { keyword: true, rank: true, observedAt: true } }),
+    context.prisma.bsrObservation.findMany({ where: { bookId, provider: context.ranks.name, observedAt: { gte: since } }, select: { bsr: true, observedAt: true } }),
   ]);
   let written = 0;
   for (const recommendation of pending) {
@@ -112,8 +113,8 @@ export async function generateReoptimizations(context: AppContext, bookId: strin
   if (!live || !discovery) return 0;
   const since = new Date(now.getTime() - HISTORY_DAYS * DAY_MS);
   const [observations, latestBsr, manuscript, seen] = await Promise.all([
-    context.prisma.rankObservation.findMany({ where: { bookId, observedAt: { gte: since } }, select: { keyword: true, rank: true, observedAt: true } }),
-    context.prisma.bsrObservation.findFirst({ where: { bookId, bsr: { not: null } }, orderBy: { observedAt: 'desc' } }),
+    context.prisma.rankObservation.findMany({ where: { bookId, provider: context.ranks.name, observedAt: { gte: since } }, select: { keyword: true, rank: true, observedAt: true } }),
+    context.prisma.bsrObservation.findFirst({ where: { bookId, provider: context.ranks.name, bsr: { not: null } }, orderBy: { observedAt: 'desc' } }),
     latestManuscript(context.prisma, bookId),
     context.prisma.recommendation.findMany({ where: { bookId }, select: { payload: true } }),
   ]);

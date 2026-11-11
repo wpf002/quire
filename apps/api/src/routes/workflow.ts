@@ -168,11 +168,11 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
     const { book } = await owned(request);
     const [keywords, ranks, bsr, versions, recommendations, categoryRanks] = await Promise.all([
       context.prisma.trackedKeyword.findMany({ where: { bookId: book.id, active: true }, orderBy: { createdAt: 'asc' } }),
-      context.prisma.rankObservation.findMany({ where: { bookId: book.id }, orderBy: { observedAt: 'asc' }, select: { keyword: true, rank: true, observedAt: true } }),
-      context.prisma.bsrObservation.findMany({ where: { bookId: book.id }, orderBy: { observedAt: 'asc' }, select: { bsr: true, observedAt: true, provider: true } }),
+      context.prisma.rankObservation.findMany({ where: { bookId: book.id, provider: context.ranks.name }, orderBy: { observedAt: 'asc' }, select: { keyword: true, rank: true, observedAt: true } }),
+      context.prisma.bsrObservation.findMany({ where: { bookId: book.id, provider: context.ranks.name }, orderBy: { observedAt: 'asc' }, select: { bsr: true, observedAt: true, provider: true } }),
       context.prisma.metadataVersion.findMany({ where: { bookId: book.id, appliedAt: { not: null } }, orderBy: { appliedAt: 'asc' }, select: { id: true, version: true, appliedAt: true, recommendationId: true } }),
       context.prisma.recommendation.findMany({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } }),
-      context.prisma.categoryRankObservation.findMany({ where: { bookId: book.id }, orderBy: { observedAt: 'asc' }, select: { category: true, rank: true, observedAt: true } }),
+      context.prisma.categoryRankObservation.findMany({ where: { bookId: book.id, provider: context.ranks.name }, orderBy: { observedAt: 'asc' }, select: { category: true, rank: true, observedAt: true } }),
     ]);
     const categoryNames = [...new Set(categoryRanks.map((entry) => entry.category))];
     const categories = categoryNames.map((category) => ({

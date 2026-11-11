@@ -183,6 +183,13 @@ describe('self-serve flow', () => {
     await worker.drain();
     const rechecked = (await client.request('GET', `/books/${bookId}/rank`)).json();
     expect((rechecked.recommendations as Array<{ status: string }>).filter((rec) => rec.status === 'open').length).toBe(openBefore);
+    // Regression: rows from another provider (a live Amazon check on a sample book) must not join the chart.
+    const foreignDay = new Date(Date.UTC(2020, 0, 1));
+    await context.prisma.bsrObservation.create({ data: { id: 'bsr_foreign', bookId, bsr: 459, provider: 'amazon-page', observedAt: foreignDay } });
+    await context.prisma.rankObservation.create({ data: { id: 'rank_foreign', bookId, keyword: 'foreign', rank: null, provider: 'amazon-page', observedAt: foreignDay } });
+    const isolated = (await client.request('GET', `/books/${bookId}/rank`)).json();
+    expect((isolated.bsr as Array<{ bsr: number }>).some((point) => point.bsr === 459)).toBe(false);
+    expect(isolated.bsr as unknown[]).toHaveLength((rechecked.bsr as unknown[]).length);
     const categories = rank.categories as Array<{ category: string; points: unknown[] }>;
     expect(categories.length).toBeGreaterThan(0);
     expect(categories[0]!.points.length).toBeGreaterThanOrEqual(30);
