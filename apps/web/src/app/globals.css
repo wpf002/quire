@@ -711,11 +711,6 @@ textarea {
   font-size: var(--text-xs);
 }
 
-.auth-foot {
-  color: var(--leather-muted);
-  font-size: var(--text-sm);
-}
-
 .auth-main {
   display: grid;
   place-items: center;
@@ -745,8 +740,7 @@ textarea {
     gap: var(--space-4);
   }
 
-  .auth-stages,
-  .auth-foot {
+  .auth-stages {
     display: none;
   }
 }

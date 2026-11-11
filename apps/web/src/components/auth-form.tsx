@@ -51,7 +51,6 @@ export function AuthForm({ mode }: { mode: Mode }) {
             </li>
           ))}
         </ol>
-        <p className="auth-foot">Every recommendation carries its data source and its measured result.</p>
       </aside>
       <section className="auth-main">
         <form className="auth-form form-grid" onSubmit={submit}>

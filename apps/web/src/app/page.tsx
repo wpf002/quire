@@ -3,12 +3,12 @@ import { Wordmark } from '@/components/wordmark';
 
 const STAGES = [
   { name: 'Manuscript', detail: 'DOCX, Markdown or text. Chapters split on import.' },
-  { name: 'Passes', detail: 'Copyedit, proofread and structural. Every change is a diff you decide.' },
+  { name: 'Passes', detail: 'Copyedit, proofread and structural. Accept or reject each change.' },
   { name: 'Compliance', detail: 'KDP AI disclosure answers built from your edit log. Rights checklist.' },
   { name: 'Listing', detail: 'Seven packed keyword boxes, category fit, royalty-aware pricing.' },
   { name: 'Export', detail: 'EPUB and print PDF for KDP or IngramSpark, with preflight.' },
   { name: 'Rank', detail: 'Daily keyword rank and BSR, tied to the listing version that was live.' },
-  { name: 'Re-Optimize', detail: 'Swap a keyword, switch a category, raise a price. Then measure it.' },
+  { name: 'Re-Optimize', detail: 'Keyword, category and price changes, scored by rank before and after.' },
 ];
 
 const TOOLS = ['Quire', 'Publisher Rocket', 'Atticus', 'Vellum', 'Rank Trackers'] as const;
@@ -81,7 +81,7 @@ export default function LandingPage() {
       <section className="landing-section" id="compare">
         <div className="landing-head">
           <p className="eyebrow">Compare</p>
-          <h2>One Tool for the Whole Launch</h2>
+          <h2>How It Compares</h2>
         </div>
         <div className="table-wrap compare">
           <table className="table">
@@ -117,7 +117,7 @@ export default function LandingPage() {
       <section className="landing-section" id="pricing">
         <div className="landing-head">
           <p className="eyebrow">Pricing</p>
-          <h2>Pay for Books, Not Seats</h2>
+          <h2>Priced Per Book</h2>
         </div>
         <div className="pricing">
           {PLANS.map((plan) => (

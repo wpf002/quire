@@ -68,7 +68,7 @@ export function reoptimize(input: ReoptimizeInput): Reoptimization[] {
       const weakest = fits.filter((fit) => input.currentCategories.includes(fit.path) && fit.fit !== 'winnable').sort((left, right) => right.salesForTopTen - left.salesForTopTen)[0];
       results.push({
         payload: { kind: 'switch-category', from: weakest?.path ?? null, to: opening.path },
-        rationale: `At ~${sales.toFixed(1)} sales a day the book can hold the top 10 in ${opening.path} (needs ~${opening.salesForTopTen.toFixed(1)}).`,
+        rationale: `About ${Math.round(sales)} sales a day. The top 10 in ${opening.path} needs about ${Math.max(1, Math.round(opening.salesForTopTen))}.`,
       });
     }
   }
