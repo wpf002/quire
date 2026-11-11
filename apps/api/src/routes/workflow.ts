@@ -4,8 +4,7 @@ import { EXPORT_TARGETS, PASS_KINDS, TRIM_SIZES } from '@quire/core';
 import { z } from 'zod';
 import { requireUser } from '../auth';
 import type { AppContext } from '../context';
-import { RankProviderError } from '@quire/tracking';
-import { conflict, notFound, upstream } from '../errors';
+import { conflict, notFound } from '../errors';
 import { idParam, parseWith } from '../http';
 import { fromJson } from '../json';
 import { loadOwnedBook } from '../services/books';
@@ -16,7 +15,7 @@ import { decideEdits } from '../services/edits';
 import { createExport, downloadName } from '../services/exports';
 import { DraftPatchSchema, applyDraft, applyRecommendation, draftVersion, issuesFor, patchDraft } from '../services/metadata';
 import { queuePass } from '../services/passes';
-import { MAX_SIMULATED_DAYS, simulateDays, sweepBook } from '../services/tracking';
+import { MAX_SIMULATED_DAYS, queueRankCheck, simulateDays } from '../services/tracking';
 
 const PassSchema = z.object({ kind: z.enum(PASS_KINDS) });
 const DecisionsSchema = z.object({
@@ -145,7 +144,10 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
   app.post('/books/:id/metadata/publish', async (request) => {
     const { user, book } = await owned(request);
     const { asin } = parseWith(PublishSchema, request.body ?? {});
-    return { live: await applyDraft(context, user.id, book.id, asin) };
+    const live = await applyDraft(context, user.id, book.id, asin);
+    // First publish: take a baseline reading now instead of waiting for the daily sweep.
+    const rankCheckJobId = book.publishedAt ? null : await queueRankCheck(context, book.id, user.id);
+    return { live, rankCheckJobId };
   });
 
   app.post('/books/:id/recommendations/:recId/apply', async (request) => {
@@ -164,13 +166,19 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
 
   app.get('/books/:id/rank', async (request) => {
     const { book } = await owned(request);
-    const [keywords, ranks, bsr, versions, recommendations] = await Promise.all([
+    const [keywords, ranks, bsr, versions, recommendations, categoryRanks] = await Promise.all([
       context.prisma.trackedKeyword.findMany({ where: { bookId: book.id, active: true }, orderBy: { createdAt: 'asc' } }),
       context.prisma.rankObservation.findMany({ where: { bookId: book.id }, orderBy: { observedAt: 'asc' }, select: { keyword: true, rank: true, observedAt: true } }),
       context.prisma.bsrObservation.findMany({ where: { bookId: book.id }, orderBy: { observedAt: 'asc' }, select: { bsr: true, observedAt: true, provider: true } }),
       context.prisma.metadataVersion.findMany({ where: { bookId: book.id, appliedAt: { not: null } }, orderBy: { appliedAt: 'asc' }, select: { id: true, version: true, appliedAt: true, recommendationId: true } }),
       context.prisma.recommendation.findMany({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } }),
+      context.prisma.categoryRankObservation.findMany({ where: { bookId: book.id }, orderBy: { observedAt: 'asc' }, select: { category: true, rank: true, observedAt: true } }),
     ]);
+    const categoryNames = [...new Set(categoryRanks.map((entry) => entry.category))];
+    const categories = categoryNames.map((category) => ({
+      category,
+      points: categoryRanks.filter((entry) => entry.category === category).map((entry) => ({ at: entry.observedAt, rank: entry.rank })),
+    }));
     const series = keywords.map((keyword) => ({
       keyword: keyword.keyword,
       points: ranks.filter((rank) => rank.keyword === keyword.keyword).map((rank) => ({ at: rank.observedAt, rank: rank.rank })),
@@ -181,6 +189,7 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
       publishedAt: book.publishedAt,
       series,
       bsr: bsr.map((point) => ({ at: point.observedAt, bsr: point.bsr })),
+      categories,
       changes: versions,
       recommendations,
     };
@@ -192,14 +201,11 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
     return simulateDays(context, book.id, days);
   });
 
-  app.post('/books/:id/rank/sweep', async (request) => {
-    const { book } = await owned(request);
-    try {
-      return await sweepBook(context, book, context.clock());
-    } catch (error) {
-      if (error instanceof RankProviderError) throw upstream(error.message);
-      throw error;
-    }
+  app.post('/books/:id/rank/check', async (request, reply) => {
+    const { user, book } = await owned(request);
+    if (!book.publishedAt) throw conflict('Publish the listing before checking ranks');
+    const jobId = await queueRankCheck(context, book.id, user.id);
+    return reply.code(202).send({ jobId });
   });
 
   app.post('/books/:id/exports', async (request, reply) => {

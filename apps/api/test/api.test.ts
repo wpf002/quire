@@ -6,7 +6,7 @@ import { Worker } from '../src/queue';
 import { runBlurbJob } from '../src/services/blurb';
 import { runDiscoveryJob } from '../src/services/discovery';
 import { runPassJob } from '../src/services/passes';
-import { sweepAll } from '../src/services/tracking';
+import { runObserveJob, sweepAll } from '../src/services/tracking';
 import { RecordingGateway, SAMPLE_MANUSCRIPT, TestClient, resetDatabase, testContext } from './helpers';
 
 let context: AppContext;
@@ -24,6 +24,7 @@ beforeAll(async () => {
       pass: (payload, job) => runPassJob(context, payload, job.final),
       discovery: (payload) => runDiscoveryJob(context, payload),
       blurb: (payload) => runBlurbJob(context, payload),
+      observe: async (payload) => runObserveJob(context, payload),
       sweep: async () => {
         await sweepAll(context);
       },
@@ -155,6 +156,17 @@ describe('self-serve flow', () => {
 
     const published = await client.request('POST', `/books/${bookId}/metadata/publish`, { asin: 'B0TEST0001' });
     expect(published.status).toBe(200);
+    // First publish queues a baseline rank check; a second Check Now while it's queued reuses that job.
+    const rankCheckJobId = published.json().rankCheckJobId as string;
+    expect(rankCheckJobId).toEqual(expect.any(String));
+    const checkNow = await client.request('POST', `/books/${bookId}/rank/check`);
+    expect(checkNow.status).toBe(202);
+    expect(checkNow.json().jobId).toBe(rankCheckJobId);
+    await worker.drain();
+    const checked = (await client.request('GET', `/jobs/${rankCheckJobId}`)).json().job as { status: string };
+    expect(checked.status).toBe('done');
+    const baseline = (await client.request('GET', `/books/${bookId}/rank`)).json();
+    expect((baseline.bsr as unknown[]).length).toBe(1);
 
     const simulation = await client.request('POST', `/books/${bookId}/rank/simulate`, { days: 30 });
     expect(simulation.json()).toMatchObject({ observed: expect.any(Number) });
@@ -164,6 +176,16 @@ describe('self-serve flow', () => {
     const rank = (await client.request('GET', `/books/${bookId}/rank`)).json();
     expect((rank.series as unknown[]).length).toBeGreaterThan(0);
     expect((rank.bsr as unknown[]).length).toBeGreaterThanOrEqual(30);
+    // Regression: a re-check must not duplicate an open rec (JSONB key order broke the dedupe).
+    const openBefore = (rank.recommendations as Array<{ status: string }>).filter((rec) => rec.status === 'open').length;
+    const recheck = await client.request('POST', `/books/${bookId}/rank/check`);
+    expect(recheck.status).toBe(202);
+    await worker.drain();
+    const rechecked = (await client.request('GET', `/books/${bookId}/rank`)).json();
+    expect((rechecked.recommendations as Array<{ status: string }>).filter((rec) => rec.status === 'open').length).toBe(openBefore);
+    const categories = rank.categories as Array<{ category: string; points: unknown[] }>;
+    expect(categories.length).toBeGreaterThan(0);
+    expect(categories[0]!.points.length).toBeGreaterThanOrEqual(30);
     const launch = (rank.recommendations as Array<{ kind: string; status: string; outcome: unknown }>).filter((rec) => rec.kind === 'keywords');
     expect(launch[0]?.status).toBe('applied');
     expect(launch[0]?.outcome).not.toBeNull();

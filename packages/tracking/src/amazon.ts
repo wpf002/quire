@@ -36,6 +36,22 @@ export function parseBestSellersRank(html: string): number | null {
   return match ? Number(match[1]!.replace(/,/g, '')) : null;
 }
 
+/** Sub-category ranks listed under the overall BSR, e.g. "#27 in Werewolf & Shifter Thrillers". */
+export function parseCategoryRanks(html: string): Array<{ category: string; rank: number }> {
+  const list = /<ul[^>]*\bzg_hrsr\b[^>]*>([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? '';
+  const ranks: Array<{ category: string; rank: number }> = [];
+  for (const item of list.match(/<li[\s\S]*?<\/li>/g) ?? []) {
+    const text = decodeEntities(item.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    const match = /^#([\d,]+)\s+(?:Free\s+)?in\s+(.+)$/.exec(text);
+    if (match) ranks.push({ category: match[2]!, rank: Number(match[1]!.replace(/,/g, '')) });
+  }
+  return ranks;
+}
+
+function decodeEntities(text: string): string {
+  return text.replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
 /** ASINs of the organic results on one search page, in order. Sponsored slots (AdHolder) are skipped. */
 export function organicAsins(html: string): string[] {
   const asins: string[] = [];
@@ -77,10 +93,10 @@ export class AmazonPageRankProvider implements RankProvider {
   async observe(metadata: TrackedMetadata, keywords: string[], at: Date): Promise<RankSnapshot> {
     const asin = metadata.asin;
     if (!asin) throw new RankProviderError(`book ${metadata.bookId} has no ASIN`);
-    const bsr = parseBestSellersRank(await this.fetchHtml(`${AMAZON_ORIGIN}/dp/${asin}`));
+    const productPage = await this.fetchHtml(`${AMAZON_ORIGIN}/dp/${asin}`);
     const ranks: RankSnapshot['ranks'] = [];
     for (const keyword of keywords) ranks.push({ keyword, rank: await this.keywordRank(asin, keyword) });
-    return { observedAt: at, bsr, ranks };
+    return { observedAt: at, bsr: parseBestSellersRank(productPage), ranks, categoryRanks: parseCategoryRanks(productPage) };
   }
 
   /** Organic position of the ASIN for a keyword, or null when it's not in the first TRACKED_DEPTH results. */

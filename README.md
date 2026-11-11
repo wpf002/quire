@@ -35,7 +35,8 @@ Open http://localhost:3000 and sign up. Leave `ANTHROPIC_API_KEY` blank to run r
 - Keyword suggestions: live Amazon autocomplete (`QUIRE_DISCOVERY_PROVIDERS=amazon,sample`).
 - Category and market data: deterministic sample providers. The UI tags them **Sample**.
 - Rank data: `QUIRE_RANK_PROVIDER=sample` (default) simulates it. On sample, the Rank tab has **+7 / +14 / +30 Days** buttons to simulate time passing.
-- `QUIRE_RANK_PROVIDER=amazon` reads public amazon.com pages once a day: BSR from the product page, keyword rank from Kindle search (organic results, top 100). It's against Amazon's terms and stops on a robot check. Expect about 2.5s per page load.
+- `QUIRE_RANK_PROVIDER=amazon` reads public amazon.com pages once a day: BSR from the product page, keyword rank from Kindle search (organic results, top 100). Sub-category ranks come from the same product page. It's against Amazon's terms and stops on a robot check. Expect about 2.5s per page load.
+- First publish queues a baseline rank check. **Check Now** on the Rank tab queues another; on `amazon` it allows one per book per hour.
 - Check the scraper by hand: `pnpm --filter @quire/tracking run probe <ASIN> "keyword"`.
 
 ## Checks

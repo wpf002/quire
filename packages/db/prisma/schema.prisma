@@ -117,6 +117,7 @@ model Book {
   trackedKeywords  TrackedKeyword[]
   rankObservations RankObservation[]
   bsrObservations  BsrObservation[]
+  categoryRanks    CategoryRankObservation[]
   exports          Export[]
   spend            SpendEntry[]
 
@@ -294,6 +295,20 @@ model BsrObservation {
   book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   @@unique([bookId, observedAt])
+}
+
+/// Rank inside one Amazon sub-category, as the product page lists it ("#27 in Werewolf & Shifter Thrillers").
+model CategoryRankObservation {
+  id         String   @id
+  bookId     String
+  category   String
+  rank       Int
+  provider   String
+  observedAt DateTime
+  book       Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, category, observedAt])
+  @@index([bookId, observedAt])
 }
 
 model Export {

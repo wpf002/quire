@@ -41,8 +41,12 @@ function summary(payload: RecommendationPayload): string {
 /** Sample providers get a gilt tag so simulated data is never mistaken for live data. */
 export function SourceTag({ source }: { source: string }) {
   const sample = source.includes('sample');
-  const label = source.replace(/^rank:/, 'Rank ').split('-').map((word) => word[0]?.toUpperCase() + word.slice(1)).join(' ');
-  return <span className={`tag ${sample ? 'tag-gilt' : 'tag-blue'}`}>{label.replace(/\bsample\b/i, 'Sample')}</span>;
+  const label = source
+    .replace(/^rank:/, 'rank ')
+    .split(/[\s-]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  return <span className={`tag ${sample ? 'tag-gilt' : 'tag-blue'}`}>{label}</span>;
 }
 
 /** One open recommendation with Apply and Dismiss. */

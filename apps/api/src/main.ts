@@ -10,7 +10,7 @@ import { Worker, enqueue } from './queue';
 import { runBlurbJob } from './services/blurb';
 import { runDiscoveryJob } from './services/discovery';
 import { runPassJob } from './services/passes';
-import { sweepAll } from './services/tracking';
+import { runObserveJob, sweepAll } from './services/tracking';
 import { FileStorage } from './storage';
 
 const SWEEP_CHECK_MS = 3_600_000;
@@ -40,6 +40,7 @@ async function main(): Promise<void> {
       pass: (payload, job) => runPassJob(context, payload, job.final),
       discovery: (payload) => runDiscoveryJob(context, payload),
       blurb: (payload) => runBlurbJob(context, payload),
+      observe: async (payload) => runObserveJob(context, payload),
       sweep: async () => {
         const { swept, failed } = await sweepAll(context);
         for (const failure of failed) app.log.warn(failure, 'rank sweep failed for book');

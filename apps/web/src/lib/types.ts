@@ -320,6 +320,7 @@ export interface RankView {
   publishedAt: string | null;
   series: Array<{ keyword: string; points: Array<{ at: string; rank: number | null }> }>;
   bsr: Array<{ at: string; bsr: number | null }>;
+  categories: Array<{ category: string; points: Array<{ at: string; rank: number }> }>;
   changes: Array<{ id: string; version: number; appliedAt: string; recommendationId: string | null }>;
   recommendations: Recommendation[];
 }

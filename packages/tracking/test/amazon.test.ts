@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AmazonPageRankProvider, RankProviderBlockedError, RankProviderError, isBlockedPage, organicAsins, parseBestSellersRank } from '../src';
+import { AmazonPageRankProvider, RankProviderBlockedError, RankProviderError, isBlockedPage, organicAsins, parseBestSellersRank, parseCategoryRanks } from '../src';
 
 // Markup shapes copied from live amazon.com pages (Nov 2026), trimmed to what the parsers read.
 const result = (asin: string, sponsored = false) =>
@@ -9,7 +9,7 @@ const LAST = '<span class="s-pagination-item s-pagination-next s-pagination-disa
 const searchPage = (asins: string[], next = true, sponsored: string[] = []) => `${sponsored.map((asin) => result(asin, true)).join('')}${asins.map((asin) => result(asin)).join('')}${next ? NEXT : LAST}`;
 const asinRange = (prefix: string, count: number) => Array.from({ length: count }, (_, index) => `${prefix}${String(index).padStart(10 - prefix.length, '0')}`);
 
-const PRODUCT_PAGE = `<li><span class="a-list-item"><span class="a-text-bold"> Best Sellers Rank: </span> #6,640 in Kindle Store (<a href='/gp/bestsellers/digital-text'>See Top 100 in Kindle Store</a>) <ul class="a-unordered-list zg_hrsr"><li><span class="a-list-item"> #27 in <a href='/gp/bestsellers/books/9536079011'>Werewolf &amp; Shifter Thrillers</a></span></li></ul></span></li>`;
+const PRODUCT_PAGE = `<li><span class="a-list-item"><span class="a-text-bold"> Best Sellers Rank: </span> #6,640 in Kindle Store (<a href='/gp/bestsellers/digital-text'>See Top 100 in Kindle Store</a>) <ul class="a-unordered-list zg_hrsr"><li><span class="a-list-item"> #27 in <a href='/gp/bestsellers/books/9536079011'>Werewolf &amp; Shifter Thrillers</a></span></li> <li><span class="a-list-item"> #1,204 in <a href='/gp/bestsellers/books/10387329011'>New Adult &amp; College Fantasy (Books)</a></span></li></ul></span></li>`;
 const ROBOT_CHECK = '<form method="get" action="/errors/validateCaptcha"><input type="hidden" name="amzn"></form>';
 
 const MINE = 'B0MINE0001';
@@ -38,6 +38,15 @@ describe('parseBestSellersRank', () => {
   });
 });
 
+describe('parseCategoryRanks', () => {
+  it('reads each listed sub-category with its rank', () => {
+    expect(parseCategoryRanks(PRODUCT_PAGE)).toEqual([
+      { category: 'Werewolf & Shifter Thrillers', rank: 27 },
+      { category: 'New Adult & College Fantasy (Books)', rank: 1204 },
+    ]);
+  });
+});
+
 describe('organicAsins', () => {
   it('skips sponsored slots and keeps page order', () => {
     expect(organicAsins(searchPage(['B0AAAAAAA1', 'B0AAAAAAA2'], true, ['B0SPONSOR1']))).toEqual(['B0AAAAAAA1', 'B0AAAAAAA2']);
@@ -52,7 +61,7 @@ describe('AmazonPageRankProvider', () => {
       'cozy mystery#2': searchPage([...asinRange('P2', 4), MINE]),
     });
     const snapshot = await provider.observe(metadata, ['cozy mystery'], new Date('2026-11-10'));
-    expect(snapshot).toMatchObject({ bsr: 6640, ranks: [{ keyword: 'cozy mystery', rank: 21 }] });
+    expect(snapshot).toMatchObject({ bsr: 6640, ranks: [{ keyword: 'cozy mystery', rank: 21 }], categoryRanks: [{ rank: 27 }, { rank: 1204 }] });
     expect(requested).toEqual([`/dp/${MINE}`, 'cozy mystery#1', 'cozy mystery#2']);
   });
 

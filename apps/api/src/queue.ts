@@ -4,7 +4,15 @@ import { newId } from '@quire/core';
 import type { FastifyBaseLogger } from 'fastify';
 import { toJson } from './json';
 
-export type JobType = 'pass' | 'discovery' | 'blurb' | 'sweep';
+export type JobType = 'pass' | 'discovery' | 'blurb' | 'sweep' | 'observe';
+
+/** A failure that retrying won't fix, such as a robot check. The job fails on the first attempt. */
+export class PermanentJobError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PermanentJobError';
+  }
+}
 const RETRY_BASE_MS = 5_000;
 const POLL_MS = 1_000;
 const STALE_LOCK_MS = 15 * 60_000;
@@ -100,7 +108,7 @@ export class Worker {
       log.error({ err: error }, 'job failed');
       await this.prisma.job.update({
         where: { id: job.id },
-        data: final
+        data: final || error instanceof PermanentJobError
           ? { status: 'failed', finishedAt: new Date(), error: message }
           : { status: 'queued', error: message, runAt: new Date(Date.now() + RETRY_BASE_MS * 2 ** (job.attempts - 1)) },
       });

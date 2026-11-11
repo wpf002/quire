@@ -25,6 +25,8 @@ export interface RankSnapshot {
   observedAt: Date;
   bsr: number | null;
   ranks: Array<{ keyword: string; rank: number | null }>;
+  /** Sub-category ranks the store lists for the book. Only ranked categories appear. */
+  categoryRanks: Array<{ category: string; rank: number }>;
 }
 
 export interface RankProvider {

@@ -2,6 +2,7 @@
 
 import { type MouseEvent, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import { waitForJob } from '@/lib/jobs';
 import { count, day } from '@/lib/format';
 import type { RankView, Recommendation, RecommendationOutcome } from '@/lib/types';
 import { useAction } from '@/lib/use-action';
@@ -157,7 +158,7 @@ function RankChart({ view }: { view: RankView }) {
 
 function BsrChart({ points }: { points: RankView['bsr'] }) {
   const ranked = points.filter((point): point is { at: string; bsr: number } => point.bsr !== null);
-  if (ranked.length < 2) return null;
+  if (ranked.length === 0) return null;
   const scale = { start: Date.parse(ranked[0]!.at), end: Date.parse(ranked.at(-1)!.at) };
   const logs = ranked.map((point) => Math.log10(point.bsr));
   const low = Math.min(...logs);
@@ -171,10 +172,47 @@ function BsrChart({ points }: { points: RankView['bsr'] }) {
         <h2>Best Sellers Rank</h2>
         <span className="num">#{count(latest.bsr)}</span>
       </div>
-      <div className="chart">
-        <svg viewBox={`0 0 ${BSR_CHART.width} ${BSR_CHART.height}`} role="img" aria-label="Best Sellers Rank over time">
-          <path className="series bsr" d={line} />
-        </svg>
+      {ranked.length > 1 && (
+        <div className="chart">
+          <svg viewBox={`0 0 ${BSR_CHART.width} ${BSR_CHART.height}`} role="img" aria-label="Best Sellers Rank over time">
+            <path className="series bsr" d={line} />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategoryRanks({ categories }: { categories: RankView['categories'] }) {
+  if (categories.length === 0) return null;
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <h2>Category Ranks</h2>
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th className="right">Now</th>
+              <th className="right">Best</th>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.map((entry) => {
+              const latest = entry.points.at(-1);
+              const best = Math.min(...entry.points.map((point) => point.rank));
+              return (
+                <tr key={entry.category}>
+                  <td>{entry.category}</td>
+                  <td className="right num">{latest ? `#${count(latest.rank)}` : '—'}</td>
+                  <td className="right num">#{count(best)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -246,9 +284,10 @@ export function RankTab() {
     });
   }
 
-  async function sweep() {
+  async function checkNow() {
     await action.run(async () => {
-      await api.post(`/books/${bookId}/rank/sweep`, {});
+      const { jobId } = await api.post<{ jobId: string }>(`/books/${bookId}/rank/check`, {});
+      await waitForJob(jobId);
       await rank.reload();
     });
   }
@@ -271,8 +310,8 @@ export function RankTab() {
                   +{days} Days
                 </button>
               ))}
-            <button type="button" className="btn btn-small btn-primary" disabled={action.busy} onClick={() => void sweep()}>
-              {action.busy ? <span className="spinner" /> : 'Sweep Now'}
+            <button type="button" className="btn btn-small btn-primary" disabled={action.busy} onClick={() => void checkNow()}>
+              {action.busy ? <span className="spinner" /> : 'Check Now'}
             </button>
           </span>
         </div>
@@ -303,6 +342,7 @@ export function RankTab() {
             </ul>
           )}
         </div>
+        <CategoryRanks categories={view.categories} />
       </div>
     </div>
   );
