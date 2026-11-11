@@ -17,6 +17,9 @@ const MIN_PREFIX = 3;
 const MAX_PREFIX_STEPS = 5;
 const SATURATED_RESULT_COUNT = 50_000;
 const STRONG_COMPETITOR_SALES = 60;
+/** Median ratings of the top results at which a keyword counts as fully contested. */
+const STRONG_COMPETITOR_REVIEWS = 1_000;
+const NEUTRAL_STRENGTH = 0.5;
 
 /** Find the shortest prefix at which Amazon suggests the keyword. */
 export async function demandScore(keyword: string, provider: KeywordSuggestionProvider, storefront: Storefront): Promise<number> {
@@ -38,10 +41,16 @@ function prefixLengths(total: number): number[] {
   return lengths;
 }
 
+/** Search pages carry ratings but no BSR, so ratings stand in for competitor strength there. */
+function reviewStrength(market: KeywordMarket): number {
+  const reviews = market.topTitles.map((title) => title.reviews).filter((count): count is number => count !== null);
+  return reviews.length > 0 ? Math.min(1, median(reviews) / STRONG_COMPETITOR_REVIEWS) : NEUTRAL_STRENGTH;
+}
+
 export function competitionScore(market: KeywordMarket): { competition: number; topSalesPerDay: number | null } {
   const ranked = market.topTitles.map((title) => title.bsr).filter((bsr): bsr is number => bsr !== null);
   const topSalesPerDay = ranked.length > 0 ? median(ranked.map(estimateDailySales)) : null;
-  const strength = topSalesPerDay === null ? 0.5 : Math.min(1, topSalesPerDay / STRONG_COMPETITOR_SALES);
+  const strength = topSalesPerDay === null ? reviewStrength(market) : Math.min(1, topSalesPerDay / STRONG_COMPETITOR_SALES);
   const crowding = market.resultCount === null ? 0.5 : Math.min(1, Math.log10(Math.max(1, market.resultCount)) / Math.log10(SATURATED_RESULT_COUNT));
   return { competition: 0.6 * strength + 0.4 * crowding, topSalesPerDay };
 }

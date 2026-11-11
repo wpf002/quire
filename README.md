@@ -32,8 +32,11 @@ Open http://localhost:3000 and sign up. Leave `ANTHROPIC_API_KEY` blank to run r
 
 ## Data Sources
 
-- Keyword suggestions: live Amazon autocomplete (`QUIRE_DISCOVERY_PROVIDERS=amazon,sample`).
-- Category and market data: deterministic sample providers. The UI tags them **Sample**.
+- `QUIRE_DISCOVERY_PROVIDERS=amazon` reads live amazon.com for discovery. Any other value uses deterministic sample providers, tagged **Sample** in the UI.
+  - Keyword suggestions: Amazon autocomplete.
+  - Market: the first search page per keyword (result count, top 10 titles, ratings, price). Search pages carry no BSR, so competitor strength comes from ratings.
+  - Categories: the bestseller lists the top 3 genre books rank in, with #1 and #10 BSR read from product pages. Up to 6 lists.
+  - A run makes about 60 page loads at 2.5s apart, so discovery takes 2 to 3 minutes. It stops on a robot check or bot-check interstitial.
 - Rank data: `QUIRE_RANK_PROVIDER=sample` (default) simulates it. On sample, the Rank tab has **+7 / +14 / +30 Days** buttons to simulate time passing.
 - `QUIRE_RANK_PROVIDER=amazon` reads public amazon.com pages once a day: BSR from the product page, keyword rank from Kindle search (organic results, top 100). Sub-category ranks come from the same product page. It's against Amazon's terms and stops on a robot check. Expect about 2.5s per page load.
 - First publish queues a baseline rank check. **Check Now** on the Rank tab queues another; on `amazon` it allows one per book per hour.

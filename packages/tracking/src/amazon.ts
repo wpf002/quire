@@ -1,17 +1,22 @@
+import {
+  AMAZON_ORIGIN,
+  AmazonBlockedError,
+  type FetchHtml,
+  fetchAmazonPage,
+  hasNextPage,
+  organicAsins,
+  parseBestSellersRank,
+  parseCategoryRanks,
+} from '@quire/discovery';
 import { type RankProvider, type RankSnapshot, TRACKED_DEPTH, type TrackedMetadata } from './types';
 
-const AMAZON_ORIGIN = 'https://www.amazon.com';
+export { type FetchHtml, isBlockedPage, organicAsins, parseBestSellersRank, parseCategoryRanks } from '@quire/discovery';
+
 const KINDLE_SEARCH_INDEX = 'digital-text';
-const REQUEST_TIMEOUT_MS = 15_000;
 /** Pause between page loads so a daily sweep stays at a human browsing pace. */
 const REQUEST_GAP_MS = 2_500;
 /** About 16 organic results per page, so 7 pages covers TRACKED_DEPTH. */
 const MAX_SEARCH_PAGES = Math.ceil(TRACKED_DEPTH / 16);
-const BROWSER_HEADERS = {
-  'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-  accept: 'text/html',
-  'accept-language': 'en-US,en;q=0.9',
-};
 
 export class RankProviderError extends Error {
   constructor(message: string) {
@@ -23,57 +28,14 @@ export class RankProviderError extends Error {
 /** Amazon served a captcha or robot check. The sweep stops for the day instead of recording bad data. */
 export class RankProviderBlockedError extends RankProviderError {}
 
-export type FetchHtml = (url: string) => Promise<string>;
-
-export function isBlockedPage(html: string): boolean {
-  return html.includes('validateCaptcha') || html.includes('api-services-support@amazon.com');
-}
-
-/** Overall Best Sellers Rank from a product page, e.g. "#6,640 in Kindle Store". Null when the page has none. */
-export function parseBestSellersRank(html: string): number | null {
-  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  const match = /Best Sellers Rank:?\s*#([\d,]+)\s+(?:Free\s+)?in\s/.exec(text);
-  return match ? Number(match[1]!.replace(/,/g, '')) : null;
-}
-
-/** Sub-category ranks listed under the overall BSR, e.g. "#27 in Werewolf & Shifter Thrillers". */
-export function parseCategoryRanks(html: string): Array<{ category: string; rank: number }> {
-  const list = /<ul[^>]*\bzg_hrsr\b[^>]*>([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? '';
-  const ranks: Array<{ category: string; rank: number }> = [];
-  for (const item of list.match(/<li[\s\S]*?<\/li>/g) ?? []) {
-    const text = decodeEntities(item.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
-    const match = /^#([\d,]+)\s+(?:Free\s+)?in\s+(.+)$/.exec(text);
-    if (match) ranks.push({ category: match[2]!, rank: Number(match[1]!.replace(/,/g, '')) });
-  }
-  return ranks;
-}
-
-function decodeEntities(text: string): string {
-  return text.replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-}
-
-/** ASINs of the organic results on one search page, in order. Sponsored slots (AdHolder) are skipped. */
-export function organicAsins(html: string): string[] {
-  const asins: string[] = [];
-  for (const tag of html.match(/<div[^>]*data-component-type="s-search-result"[^>]*>/g) ?? []) {
-    if (/class="[^"]*\bAdHolder\b/.test(tag)) continue;
-    const asin = /data-asin="([A-Z0-9]{10})"/.exec(tag)?.[1];
-    if (asin && !asins.includes(asin)) asins.push(asin);
-  }
-  return asins;
-}
-
-function hasNextPage(html: string): boolean {
-  return /class="s-pagination-item s-pagination-next(?![^"]*s-pagination-disabled)/.test(html);
-}
-
 export async function fetchAmazonHtml(url: string): Promise<string> {
-  const response = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
-  if (response.status === 503) throw new RankProviderBlockedError(`HTTP 503 for ${new URL(url).pathname}`);
-  if (!response.ok) throw new RankProviderError(`HTTP ${response.status} for ${new URL(url).pathname}`);
-  const html = await response.text();
-  if (isBlockedPage(html)) throw new RankProviderBlockedError(`robot check on ${new URL(url).pathname}`);
-  return html;
+  try {
+    return await fetchAmazonPage('amazon-page', url);
+  } catch (error) {
+    const reason = (error instanceof Error ? error.message : String(error)).replace(/^amazon-page: /, '');
+    if (error instanceof AmazonBlockedError) throw new RankProviderBlockedError(reason);
+    throw new RankProviderError(reason);
+  }
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));

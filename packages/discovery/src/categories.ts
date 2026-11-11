@@ -34,3 +34,14 @@ export function rankCategories(categories: CategoryThresholds[], expectedDailySa
     .map((category) => categoryFit(category, expectedDailySales))
     .sort((left, right) => FIT_ORDER[left.fit] - FIT_ORDER[right.fit] || right.salesForFirst - left.salesForFirst);
 }
+
+/**
+ * Categories for the KDP draft. Winnable and stretch lists first. KDP still needs categories when every
+ * list is crowded (the usual case for big-genre lists), so the rest fill with the easiest #10 spots.
+ * Ghost lists never fill a slot.
+ */
+export function pickDraftCategories(ranked: CategoryFitResult[], slots: number): CategoryFitResult[] {
+  const reachable = ranked.filter((category) => category.fit === 'winnable' || category.fit === 'stretch');
+  const crowded = ranked.filter((category) => category.fit === 'crowded').sort((left, right) => left.salesForTopTen - right.salesForTopTen);
+  return [...reachable, ...crowded].slice(0, slots);
+}

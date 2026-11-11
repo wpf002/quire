@@ -1,5 +1,6 @@
 export * from './providers';
 export * from './http';
+export * from './amazon-pages';
 export * from './amazon';
 export * from './sample';
 export * from './sales';

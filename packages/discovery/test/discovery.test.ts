@@ -11,7 +11,9 @@ import {
   estimateDailySales,
   packKeywordBoxes,
   paperbackRoyaltyCents,
+  pickDraftCategories,
   printCostCents,
+  rankCategories,
   recommendPaperbackPrice,
   runDiscovery,
   validateMetadata,
@@ -54,6 +56,17 @@ describe('category fit', () => {
     expect(categoryFit({ path: 'a', bsrFirst: 900_000, bsrTenth: 2_000_000 }, 3).fit).toBe('ghost');
     expect(categoryFit({ path: 'b', bsrFirst: 8_000, bsrTenth: 60_000 }, 3).fit).toBe('winnable');
     expect(categoryFit({ path: 'c', bsrFirst: 20, bsrTenth: 300 }, 3).fit).toBe('crowded');
+  });
+
+  it('fills the draft with the least crowded lists when none are winnable', () => {
+    // Regression: live Amazon lists were all crowded, so the draft shipped with zero categories.
+    const lists = [
+      { path: 'busy', bsrFirst: 2, bsrTenth: 547 },
+      { path: 'easier', bsrFirst: 122, bsrTenth: 2_925 },
+      { path: 'ghost', bsrFirst: 900_000, bsrTenth: 2_000_000 },
+      { path: 'winnable', bsrFirst: 8_000, bsrTenth: 60_000 },
+    ];
+    expect(pickDraftCategories(rankCategories(lists, 3), 3).map((category) => category.path)).toEqual(['winnable', 'easier', 'busy']);
   });
 });
 

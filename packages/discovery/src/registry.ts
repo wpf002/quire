@@ -1,15 +1,15 @@
-import { AmazonAutocompleteProvider } from './amazon';
-import type { DiscoveryProviders, KeywordSuggestionProvider } from './providers';
+import { AmazonAutocompleteProvider, AmazonCategoryProvider, AmazonMarketProvider, PacedPageFetcher } from './amazon';
+import type { DiscoveryProviders } from './providers';
 import { SampleCategoryProvider, SampleMarketProvider, SampleSuggestionProvider } from './sample';
 
-const SUGGESTION_PROVIDERS: Record<string, () => KeywordSuggestionProvider> = {
-  amazon: () => new AmazonAutocompleteProvider(),
-  sample: () => new SampleSuggestionProvider(),
-};
-
-/** Build providers from QUIRE_DISCOVERY_PROVIDERS, e.g. "amazon,sample". First entry supplies suggestions. */
+/**
+ * Build providers from QUIRE_DISCOVERY_PROVIDERS. "amazon" reads live amazon.com for suggestions,
+ * market and categories; anything else gets the deterministic sample providers.
+ */
 export function providersFromConfig(list: string[]): DiscoveryProviders {
-  const name = list.find((entry) => entry in SUGGESTION_PROVIDERS) ?? 'sample';
-  const factory = SUGGESTION_PROVIDERS[name] ?? SUGGESTION_PROVIDERS.sample!;
-  return { suggestions: factory(), market: new SampleMarketProvider(), categories: new SampleCategoryProvider() };
+  if (!list.includes('amazon')) {
+    return { suggestions: new SampleSuggestionProvider(), market: new SampleMarketProvider(), categories: new SampleCategoryProvider() };
+  }
+  const pages = new PacedPageFetcher();
+  return { suggestions: new AmazonAutocompleteProvider(), market: new AmazonMarketProvider(pages), categories: new AmazonCategoryProvider(pages) };
 }

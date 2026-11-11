@@ -2,6 +2,7 @@ import { estimatePrintPages, manuscriptWordCount, newId } from '@quire/core';
 import {
   type DiscoveryResult,
   type RecommendationPayload,
+  pickDraftCategories,
   recommendEbookPrice,
   recommendPaperbackPrice,
   runDiscovery,
@@ -45,7 +46,7 @@ export async function runDiscoveryJob(context: AppContext, payload: unknown): Pr
   const ebook = recommendEbookPrice({ compMedianCents: result.compMedianPriceCents, fileSizeMb, seriesStarter: book.seriesStarter });
   const paperback = recommendPaperbackPrice({ pages, compMedianCents: result.compMedianPriceCents });
 
-  const pickedCategories = result.categories.filter((category) => category.fit === 'winnable' || category.fit === 'stretch').slice(0, KDP_CATEGORY_SLOTS);
+  const pickedCategories = pickDraftCategories(result.categories, KDP_CATEGORY_SLOTS);
   const categories = pickedCategories.map((category) => category.path);
   const filledBoxes = result.boxes.filter((box) => box.text.length > 0).length;
 
