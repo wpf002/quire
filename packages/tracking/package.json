@@ -3,11 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src test",
-    "test": "vitest run"
+    "lint": "eslint src test scripts",
+    "test": "vitest run",
+    "probe": "tsx scripts/probe.ts"
   },
-  "dependencies": { "@quire/core": "workspace:*", "@quire/discovery": "workspace:*" }
+  "dependencies": {
+    "@quire/core": "workspace:*",
+    "@quire/discovery": "workspace:*"
+  }
 }

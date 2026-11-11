@@ -2,7 +2,7 @@ import { estimatePrintPages, newId } from '@quire/core';
 import type { RecommendationOutcome, RecommendationPayload } from '@quire/discovery';
 import { median } from '@quire/discovery';
 import { type Book, Prisma, type Recommendation } from '@quire/db';
-import { type RankObservation, attributeBsrChange, attributeKeywordChange, reoptimize, verdictForRank } from '@quire/tracking';
+import { type RankObservation, RankProviderBlockedError, RankProviderError, attributeBsrChange, attributeKeywordChange, reoptimize, verdictForRank } from '@quire/tracking';
 import type { AppContext } from '../context';
 import { conflict } from '../errors';
 import { fromJson, toJson } from '../json';
@@ -26,7 +26,7 @@ export async function observeDay(context: AppContext, book: Book, at: Date): Pro
   const keywords = await context.prisma.trackedKeyword.findMany({ where: { bookId: book.id, active: true, createdAt: { lte: at } }, select: { keyword: true } });
   // Ranking momentum dates from launch, not from each later metadata edit.
   const snapshot = await context.ranks.observe(
-    { bookId: book.id, title: book.title, keywordBoxes: live.keywordBoxes, categories: live.categories, appliedAt: book.publishedAt },
+    { bookId: book.id, asin: book.asin, title: book.title, keywordBoxes: live.keywordBoxes, categories: live.categories, appliedAt: book.publishedAt },
     keywords.map((keyword) => keyword.keyword),
     day,
   );
@@ -132,11 +132,28 @@ export async function sweepBook(context: AppContext, book: Book, now: Date) {
   return { observed, outcomes, recommendations };
 }
 
-export async function sweepAll(context: AppContext): Promise<number> {
+export interface SweepFailure {
+  bookId: string;
+  error: string;
+}
+
+/** Sweep every published book. One book's provider failure is reported, not fatal; a robot check stops the run. */
+export async function sweepAll(context: AppContext): Promise<{ swept: number; failed: SweepFailure[] }> {
   const now = context.clock();
   const books = await context.prisma.book.findMany({ where: { publishedAt: { not: null } } });
-  for (const book of books) await sweepBook(context, book, now);
-  return books.length;
+  const failed: SweepFailure[] = [];
+  let swept = 0;
+  for (const book of books) {
+    try {
+      await sweepBook(context, book, now);
+      swept += 1;
+    } catch (error) {
+      if (!(error instanceof RankProviderError)) throw error;
+      failed.push({ bookId: book.id, error: error.message });
+      if (error instanceof RankProviderBlockedError) break;
+    }
+  }
+  return { swept, failed };
 }
 
 /**

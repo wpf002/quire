@@ -4,7 +4,8 @@ import { EXPORT_TARGETS, PASS_KINDS, TRIM_SIZES } from '@quire/core';
 import { z } from 'zod';
 import { requireUser } from '../auth';
 import type { AppContext } from '../context';
-import { conflict, notFound } from '../errors';
+import { RankProviderError } from '@quire/tracking';
+import { conflict, notFound, upstream } from '../errors';
 import { idParam, parseWith } from '../http';
 import { fromJson } from '../json';
 import { loadOwnedBook } from '../services/books';
@@ -193,7 +194,12 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
 
   app.post('/books/:id/rank/sweep', async (request) => {
     const { book } = await owned(request);
-    return sweepBook(context, book, context.clock());
+    try {
+      return await sweepBook(context, book, context.clock());
+    } catch (error) {
+      if (error instanceof RankProviderError) throw upstream(error.message);
+      throw error;
+    }
   });
 
   app.post('/books/:id/exports', async (request, reply) => {

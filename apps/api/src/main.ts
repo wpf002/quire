@@ -1,7 +1,7 @@
 import { createFlintGateway } from '@quire/core';
 import { createPrisma } from '@quire/db';
 import { providersFromConfig } from '@quire/discovery';
-import { SampleRankProvider } from '@quire/tracking';
+import { AmazonPageRankProvider, SampleRankProvider } from '@quire/tracking';
 import { buildApp } from './app';
 import type { AppContext } from './context';
 import { loadEnv } from './env';
@@ -27,7 +27,10 @@ async function main(): Promise<void> {
     ledger: new PrismaSpendLedger(prisma, env.QUIRE_PLATFORM_SPEND_CAP_CENTS_DAILY, clock),
     gateway: await createFlintGateway(env.ANTHROPIC_API_KEY, env.QUIRE_MODEL_CHEAP),
     discovery: providersFromConfig(env.QUIRE_DISCOVERY_PROVIDERS),
-    ranks: Object.assign(new SampleRankProvider(), { supportsBackfill: true }),
+    ranks:
+      env.QUIRE_RANK_PROVIDER === 'amazon'
+        ? Object.assign(new AmazonPageRankProvider(), { supportsBackfill: false })
+        : Object.assign(new SampleRankProvider(), { supportsBackfill: true }),
   };
   const app = await buildApp(context);
 
@@ -38,8 +41,9 @@ async function main(): Promise<void> {
       discovery: (payload) => runDiscoveryJob(context, payload),
       blurb: (payload) => runBlurbJob(context, payload),
       sweep: async () => {
-        const swept = await sweepAll(context);
-        app.log.info({ swept }, 'daily sweep done');
+        const { swept, failed } = await sweepAll(context);
+        for (const failure of failed) app.log.warn(failure, 'rank sweep failed for book');
+        app.log.info({ swept, failed: failed.length }, 'daily sweep done');
       },
     },
     app.log,

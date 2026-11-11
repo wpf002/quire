@@ -12,7 +12,7 @@ const EnvSchema = z.object({
   QUIRE_MODEL_STRUCTURAL: z.string().default('claude-sonnet-5-5'),
   QUIRE_PLATFORM_SPEND_CAP_CENTS_DAILY: z.coerce.number().int().nonnegative().default(2_000),
   QUIRE_DISCOVERY_PROVIDERS: z.string().default('amazon,sample').transform((value) => value.split(',').map((entry) => entry.trim()).filter(Boolean)),
-  QUIRE_RANK_PROVIDER: z.enum(['sample']).default('sample'),
+  QUIRE_RANK_PROVIDER: z.enum(['sample', 'amazon']).default('sample'),
   QUIRE_WORKER: z.enum(['on', 'off']).default('on'),
 });
 

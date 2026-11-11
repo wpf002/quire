@@ -13,6 +13,8 @@ export interface BsrObservation {
 /** The live metadata a rank provider is checking against. */
 export interface TrackedMetadata {
   bookId: string;
+  /** Amazon ID of the live listing. Live providers need it; the sample provider ignores it. */
+  asin: string | null;
   title: string;
   keywordBoxes: string[];
   categories: string[];
