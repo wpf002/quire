@@ -35,6 +35,10 @@ describe('replaceInBlock', () => {
     const block = { kind: 'paragraph' as const, id: 'b', runs: [{ text: '“Did you recieve the flour?”' }] };
     expect(replaceInBlock(block, '"Did you recieve the flou', '"Did you receive the flou')?.runs).toEqual([{ text: '“Did you receive the flour?”' }]);
   });
+  it('relocates a quote fix whose neighbouring apostrophe was curled', () => {
+    const block = { kind: 'paragraph' as const, id: 'b', runs: [{ text: '"It’s over there,” she said.' }] };
+    expect(replaceInBlock(block, `"It's over th`, `“It's over th`)?.runs).toEqual([{ text: '“It’s over there,” she said.' }]);
+  });
   it('refuses to relocate when the trimmed match is ambiguous', () => {
     const block = { kind: 'paragraph' as const, id: 'b', runs: [{ text: 'a teh bakery, b teh bakery' }] };
     expect(replaceInBlock(block, 'x teh bakery', 'x the bakery')).toBeNull();

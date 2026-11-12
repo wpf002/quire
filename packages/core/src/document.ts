@@ -69,6 +69,11 @@ export function findBlock(manuscript: Manuscript, blockId: string): { chapter: C
 /** Context kept on each side of a change when relocating it after nearby text changed. */
 const MIN_RELOCATE_CONTEXT = 4;
 
+/** Maps curly quotes to straight ones. Keeps length, so indexes still line up with the original text. */
+function straightenQuotes(text: string): string {
+  return text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+}
+
 function countOccurrences(text: string, needle: string): number {
   let count = 0;
   for (let index = text.indexOf(needle); index >= 0; index = text.indexOf(needle, index + 1)) count += 1;
@@ -77,8 +82,8 @@ function countOccurrences(text: string, needle: string): number {
 
 /**
  * Finds where `before` → `after` applies in `text`. Uses the exact `before` when present. Otherwise
- * an accepted neighbour may have changed its context, so it trims the context down to the changed
- * characters plus MIN_RELOCATE_CONTEXT on each side and requires that to match exactly once.
+ * an accepted neighbour may have changed its context, so it ignores quote style, trims the context
+ * down to the changed characters plus MIN_RELOCATE_CONTEXT on each side, and requires one match.
  */
 export function locateChange(text: string, before: string, after: string): { start: number; end: number; replacement: string } | null {
   const exact = text.indexOf(before);
@@ -89,14 +94,15 @@ export function locateChange(text: string, before: string, after: string): { sta
   while (suffix < before.length - prefix && suffix < after.length - prefix && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix += 1;
   const core = before.slice(prefix, before.length - suffix);
   const replacement = after.slice(prefix, after.length - suffix);
-  for (let context = Math.max(prefix, suffix) - 1; context >= MIN_RELOCATE_CONTEXT; context -= 1) {
+  const searchText = straightenQuotes(text);
+  for (let context = Math.max(prefix, suffix); context >= MIN_RELOCATE_CONTEXT; context -= 1) {
     const left = before.slice(prefix - Math.min(context, prefix), prefix);
     const right = before.slice(before.length - suffix, before.length - suffix + Math.min(context, suffix));
-    const needle = left + core + right;
-    const matches = countOccurrences(text, needle);
+    const needle = straightenQuotes(left + core + right);
+    const matches = countOccurrences(searchText, needle);
     if (matches > 1) return null;
     if (matches === 1) {
-      const start = text.indexOf(needle) + left.length;
+      const start = searchText.indexOf(needle) + left.length;
       return { start, end: start + core.length, replacement };
     }
   }
