@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Manuscript, ModelGateway } from '@quire/core';
-import { classifyModelEdit, manuscriptForReview, runPass, unavailableForTest } from './helpers';
+import { blockTexts, classifyModelEdit, dropDuplicateEdits, manuscriptForReview, runPass, unavailableForTest } from './helpers';
 
 const manuscript: Manuscript = {
   title: 'T',
@@ -116,5 +116,25 @@ describe('manuscriptForReview', () => {
     expect(review).toContain('## Chapter 1: The Missing Loaf\n');
     expect(review).not.toContain('Chapter 1: Chapter 1');
     expect(review).toContain('## Chapter 2: The Key\n');
+  });
+});
+
+describe('dropDuplicateEdits', () => {
+  const texts = blockTexts(manuscript);
+
+  // Regression: copyedit's model and proofread's rule both proposed "the the" → "the", so the author reviewed it twice.
+  it('drops a fix another edit already makes, whatever span it quotes', () => {
+    const existing = [{ blockId: 'p1', before: 'the the door', after: 'the door' }];
+    const candidates = [
+      { blockId: 'p1', before: 'the the', after: 'the' },
+      { blockId: 'p1', before: 'weird ,', after: 'weird,' },
+      { blockId: 'p1', before: 'weird ,', after: 'weird,' },
+    ];
+    expect(dropDuplicateEdits(candidates, existing, texts)).toEqual([{ blockId: 'p1', before: 'weird ,', after: 'weird,' }]);
+  });
+
+  it('keeps edits it cannot place in the block', () => {
+    const stale = { blockId: 'p1', before: 'not in the text', after: 'x' };
+    expect(dropDuplicateEdits([stale], [stale], texts)).toEqual([stale]);
   });
 });

@@ -1,5 +1,5 @@
 import { type PassKind, meteredGateway, newId } from '@quire/core';
-import { runPass } from '@quire/editing';
+import { blockTexts, dropDuplicateEdits, runPass } from '@quire/editing';
 import { z } from 'zod';
 import type { AppContext } from '../context';
 import { toJson } from '../json';
@@ -26,9 +26,12 @@ export async function runPassJob(context: AppContext, payload: unknown, final: b
     const ledger = new CountingLedger(context.ledger);
     const gateway = meteredGateway(context.gateway, ledger, { accountId: pass.book.userId, bookId: pass.bookId, purpose: `pass:${pass.kind}` });
     const result = await runPass(pass.kind, manuscript, gateway, { cheap: context.env.QUIRE_MODEL_CHEAP, structural: context.env.QUIRE_MODEL_STRUCTURAL });
+    // Copyedit and proofread overlap, and a rule and the model can flag the same typo. The author reviews each fix once.
+    const pending = await context.prisma.edit.findMany({ where: { bookId: pass.bookId, status: 'pending' }, select: { blockId: true, before: true, after: true } });
+    const edits = dropDuplicateEdits(result.edits, pending, blockTexts(manuscript));
     await context.prisma.$transaction([
       context.prisma.edit.createMany({
-        data: result.edits.map((edit) => ({
+        data: edits.map((edit) => ({
           id: newId('edit'),
           passId,
           bookId: pass.bookId,

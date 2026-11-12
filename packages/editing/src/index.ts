@@ -4,3 +4,4 @@ export * from './classify';
 export * from './model';
 export * from './blurb';
 export * from './passes';
+export * from './dedupe';
