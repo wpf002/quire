@@ -49,11 +49,12 @@ export function EditsTab() {
   const decide = useCallback(
     async (decisions: Array<{ id: string; action: 'accept' | 'reject'; after?: string }>) => {
       if (decisions.length === 0) return;
-      const ids = new Set(decisions.map((decision) => decision.id));
       await action.run(async () => {
         const result = await api.post<DecideResult>(`/books/${bookId}/edits/decide`, { decisions });
-        setTally((previous) => ({ accepted: previous.accepted + result.accepted, rejected: previous.rejected + result.rejected, stale: previous.stale + result.stale }));
-        if (edits.data) edits.setData({ edits: edits.data.edits.filter((edit) => !ids.has(edit.id)) });
+        // Stale edits stay pending on the server, so they stay in the list too.
+        const decided = new Set([...result.accepted, ...result.rejected]);
+        setTally((previous) => ({ accepted: previous.accepted + result.accepted.length, rejected: previous.rejected + result.rejected.length, stale: previous.stale + result.stale.length }));
+        if (edits.data) edits.setData({ edits: edits.data.edits.filter((edit) => !decided.has(edit.id)) });
         setRevising(null);
         await reload();
       });

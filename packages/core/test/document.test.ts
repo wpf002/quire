@@ -30,6 +30,15 @@ describe('replaceInBlock', () => {
     const block = { kind: 'paragraph' as const, id: 'b', runs: [{ text: 'Hel' }, { text: 'lo there' }] };
     expect(replaceInBlock(block, 'Hello', 'Hi')?.runs).toEqual([{ text: 'Hi there' }]);
   });
+  // Regression: accepting a smart-quote fix changed the context of a misspelling fix beside it, so it went stale.
+  it('relocates a change whose context an accepted neighbour changed', () => {
+    const block = { kind: 'paragraph' as const, id: 'b', runs: [{ text: '“Did you recieve the flour?”' }] };
+    expect(replaceInBlock(block, '"Did you recieve the flou', '"Did you receive the flou')?.runs).toEqual([{ text: '“Did you receive the flour?”' }]);
+  });
+  it('refuses to relocate when the trimmed match is ambiguous', () => {
+    const block = { kind: 'paragraph' as const, id: 'b', runs: [{ text: 'a teh bakery, b teh bakery' }] };
+    expect(replaceInBlock(block, 'x teh bakery', 'x the bakery')).toBeNull();
+  });
   it('returns null when the text is gone', () => {
     const block = { kind: 'paragraph' as const, id: 'b', runs: [{ text: 'abc' }] };
     expect(replaceInBlock(block, 'xyz', 'q')).toBeNull();

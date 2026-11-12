@@ -58,9 +58,12 @@ export const COPYEDIT_RULES: TextRule[] = [
   {
     id: 'smart-quotes',
     reason: 'Straight quotes to typographic quotes',
+    // One edit per quote mark, so a quote fix never spans another rule's fix in the same sentence.
     find(text) {
-      if (!/["']/.test(text)) return [];
-      return [[text, curlQuotes(text)]];
+      const curled = curlQuotes(text);
+      const found: Array<[string, string]> = [];
+      for (let index = 0; index < text.length; index += 1) if (curled[index] !== text[index]) found.push(withContext(text, index, 1, curled[index]!));
+      return found;
     },
   },
   regexRule('em-dash', 'Double hyphen to em dash', /\s?--\s?/, () => '—'),

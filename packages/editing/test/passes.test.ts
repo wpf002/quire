@@ -36,6 +36,17 @@ describe('runPass rules', () => {
   });
 });
 
+describe('copyedit rules', () => {
+  // Regression: smart-quotes proposed the whole paragraph, so it overlapped every other fix in the block and went stale.
+  it('proposes one smart-quote edit per quote mark', async () => {
+    const result = await runPass('copyedit', manuscript, unavailableForTest, models);
+    const quotes = result.edits.filter((edit) => edit.rule === 'smart-quotes');
+    expect(quotes).toHaveLength(2);
+    expect(quotes.every((edit) => edit.before.length < 30)).toBe(true);
+    expect(quotes.map((edit) => edit.after)).toEqual(['She said “hello" -- th', ' said "hello” -- then lef']);
+  });
+});
+
 describe('proofread rules', () => {
   const dialogue: Manuscript = {
     title: 'T',

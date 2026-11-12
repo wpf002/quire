@@ -154,10 +154,10 @@ export interface Edit {
 }
 
 export interface DecideResult {
-  accepted: number;
-  rejected: number;
-  stale: number;
-  version: number;
+  accepted: string[];
+  rejected: string[];
+  stale: string[];
+  version: number | null;
 }
 
 export interface Job {

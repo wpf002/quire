@@ -66,21 +66,60 @@ export function findBlock(manuscript: Manuscript, blockId: string): { chapter: C
   return null;
 }
 
+/** Context kept on each side of a change when relocating it after nearby text changed. */
+const MIN_RELOCATE_CONTEXT = 4;
+
+function countOccurrences(text: string, needle: string): number {
+  let count = 0;
+  for (let index = text.indexOf(needle); index >= 0; index = text.indexOf(needle, index + 1)) count += 1;
+  return count;
+}
+
+/**
+ * Finds where `before` → `after` applies in `text`. Uses the exact `before` when present. Otherwise
+ * an accepted neighbour may have changed its context, so it trims the context down to the changed
+ * characters plus MIN_RELOCATE_CONTEXT on each side and requires that to match exactly once.
+ */
+export function locateChange(text: string, before: string, after: string): { start: number; end: number; replacement: string } | null {
+  const exact = text.indexOf(before);
+  if (exact >= 0) return { start: exact, end: exact + before.length, replacement: after };
+  let prefix = 0;
+  while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < before.length - prefix && suffix < after.length - prefix && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix += 1;
+  const core = before.slice(prefix, before.length - suffix);
+  const replacement = after.slice(prefix, after.length - suffix);
+  for (let context = Math.max(prefix, suffix) - 1; context >= MIN_RELOCATE_CONTEXT; context -= 1) {
+    const left = before.slice(prefix - Math.min(context, prefix), prefix);
+    const right = before.slice(before.length - suffix, before.length - suffix + Math.min(context, suffix));
+    const needle = left + core + right;
+    const matches = countOccurrences(text, needle);
+    if (matches > 1) return null;
+    if (matches === 1) {
+      const start = text.indexOf(needle) + left.length;
+      return { start, end: start + core.length, replacement };
+    }
+  }
+  return null;
+}
+
+function splice(text: string, location: { start: number; end: number; replacement: string }): string {
+  return text.slice(0, location.start) + location.replacement + text.slice(location.end);
+}
+
 /**
  * Replaces `before` with `after` inside a block. Keeps formatting when the match sits inside one run;
  * otherwise flattens the block to a single plain run so the text is still correct.
  */
 export function replaceInBlock(block: TextBlock, before: string, after: string): TextBlock | null {
-  const runIndex = block.runs.findIndex((run) => run.text.includes(before));
-  if (runIndex >= 0) {
-    const runs = block.runs.map((run, index) =>
-      index === runIndex ? { ...run, text: run.text.replace(before, after) } : run,
-    );
-    return { ...block, runs };
+  for (const [runIndex, run] of block.runs.entries()) {
+    const location = locateChange(run.text, before, after);
+    if (location) return { ...block, runs: block.runs.map((other, index) => (index === runIndex ? { ...other, text: splice(other.text, location) } : other)) };
   }
   const flat = runsText(block.runs);
-  if (!flat.includes(before)) return null;
-  return { ...block, runs: [{ text: flat.replace(before, after) }] };
+  const location = locateChange(flat, before, after);
+  if (!location) return null;
+  return { ...block, runs: [{ text: splice(flat, location) }] };
 }
 
 /** Estimated 6x9 print page count at ~300 words per page plus chapter openers. */
