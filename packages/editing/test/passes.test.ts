@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Manuscript, ModelGateway } from '@quire/core';
-import { classifyModelEdit, runPass, unavailableForTest } from './helpers';
+import { classifyModelEdit, manuscriptForReview, runPass, unavailableForTest } from './helpers';
 
 const manuscript: Manuscript = {
   title: 'T',
@@ -86,5 +86,16 @@ describe('classifyModelEdit', () => {
   it('treats new prose as generated', () => {
     const after = 'The rain came down hard, drumming against windows while the old house groaned under its weight and every shutter rattled like teeth in a skull that refused silence through the night.';
     expect(classifyModelEdit('It rained.', after)).toBe('generated');
+  });
+});
+
+describe('manuscriptForReview', () => {
+  it('does not repeat a chapter number the title already has', () => {
+    // Regression: "Chapter 1: The Missing Loaf" reached the model as "Chapter 1: Chapter 1: ...", and it flagged the heading.
+    const numbered: Manuscript = { ...manuscript, chapters: [{ ...manuscript.chapters[0]!, title: 'Chapter 1: The Missing Loaf' }, { ...manuscript.chapters[0]!, id: 'c2', title: 'The Key' }] };
+    const review = manuscriptForReview(numbered);
+    expect(review).toContain('## Chapter 1: The Missing Loaf\n');
+    expect(review).not.toContain('Chapter 1: Chapter 1');
+    expect(review).toContain('## Chapter 2: The Key\n');
   });
 });

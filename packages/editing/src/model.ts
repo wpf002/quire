@@ -65,12 +65,19 @@ export async function modelLineEdits(
   return edits;
 }
 
+// Titles imported from "# Chapter 3: The Key" already carry the number.
+const NUMBERED_TITLE_PATTERN = /^(chapter|part|prologue|epilogue)\b/i;
+
+function reviewHeading(title: string, index: number): string {
+  return NUMBERED_TITLE_PATTERN.test(title) ? title : `Chapter ${index + 1}: ${title}`;
+}
+
 export function manuscriptForReview(manuscript: Manuscript): string {
   const parts: string[] = [];
   let length = 0;
   manuscript.chapters.forEach((chapter, index) => {
     const body = chapter.blocks.map(blockText).filter(Boolean).join('\n');
-    const section = `\n## Chapter ${index + 1}: ${chapter.title}\n${body}`;
+    const section = `\n## ${reviewHeading(chapter.title, index)}\n${body}`;
     const room = STRUCTURAL_MAX_CHARS - length;
     if (room <= 0) return;
     const clipped = section.length > room ? `${section.slice(0, room)}\n[chapter truncated]` : section;
