@@ -22,7 +22,7 @@ export interface DiscoveryResult {
 }
 
 export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryProviders): Promise<DiscoveryResult> {
-  const candidates = await expandSeeds(input.seeds, providers.suggestions, input.storefront, input.candidateLimit);
+  const candidates = await expandSeeds(input.seeds, providers.suggestions, input.storefront, input.candidateLimit, input.genre);
   const keywords: KeywordScore[] = [];
   const compPrices: number[] = [];
   for (const keyword of candidates) {

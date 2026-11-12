@@ -9,6 +9,9 @@ import {
   keywordBoxText,
   ebookRoyaltyCents,
   estimateDailySales,
+  expandSeeds,
+  expansionPhrases,
+  isUsableKeyword,
   packKeywordBoxes,
   paperbackRoyaltyCents,
   pickDraftCategories,
@@ -117,6 +120,35 @@ describe('keywords', () => {
 
   it('rebuilds box text from phrases without title words or repeats', () => {
     expect(keywordBoxText(['dark fantasy romance', 'salt flats fantasy'], 'The Salt Road', null)).toBe('dark fantasy romance flats');
+  });
+
+  it('backs long seeds off to their last two words and adds the genre', () => {
+    expect(expansionPhrases(['Small Town Baker Sleuth', 'cozy mystery'], 'Cozy Mystery')).toEqual([
+      'small town baker sleuth',
+      'baker sleuth',
+      'cozy mystery',
+    ]);
+  });
+
+  it('drops free, box set, numbered and title-length suggestions', () => {
+    expect(isUsableKeyword('cozy mystery with cats')).toBe(true);
+    expect(isUsableKeyword('cozy mystery free')).toBe(false);
+    expect(isUsableKeyword('cozy mystery box set')).toBe(false);
+    expect(isUsableKeyword('cozy mystery book 1')).toBe(false);
+    expect(isUsableKeyword('the case of the missing cupcake a cozy mystery')).toBe(false);
+  });
+
+  it('expands with letter suffixes and interleaves phrases', async () => {
+    const lettered: KeywordSuggestionProvider = {
+      name: 'lettered',
+      async suggest(prefix) {
+        const match = /^(.*) ([a-z])$/.exec(prefix);
+        if (!match) return { prefix, suggestions: [] };
+        return { prefix, suggestions: [`${match[1]} ${match[2]}${match[2]}`, `${match[1]} free`] };
+      },
+    };
+    const candidates = await expandSeeds(['baker sleuth'], lettered, 'kindle', 6, 'cozy mystery');
+    expect(candidates).toEqual(['baker sleuth', 'cozy mystery', 'baker sleuth aa', 'cozy mystery aa', 'baker sleuth bb', 'cozy mystery bb']);
   });
 
   it('flags over-length metadata', () => {

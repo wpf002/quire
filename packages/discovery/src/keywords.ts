@@ -65,15 +65,55 @@ export function combineScore(demand: number, competition: number): number {
   return Math.round(100 * demand * (1 - 0.7 * competition)) / 100;
 }
 
-/** Expand seed phrases into candidate keywords using the suggestion provider. */
-export async function expandSeeds(seeds: string[], provider: KeywordSuggestionProvider, storefront: Storefront, limit: number): Promise<string[]> {
-  const found = new Set<string>();
-  for (const seed of seeds) {
-    const normalized = seed.toLowerCase().trim();
-    if (normalized) found.add(normalized);
-    const { suggestions } = await provider.suggest(`${normalized} `, storefront);
-    for (const suggestion of suggestions) found.add(suggestion);
-    if (found.size >= limit) break;
+/** Amazon autocomplete returns little for long phrases, so each seed also tries its last two words. */
+const BACKOFF_WORDS = 2;
+/** "cozy mystery a" … "cozy mystery z" surfaces the long tail that a bare prefix hides. */
+const SUFFIXES = [' ', ...'abcdefghijklmnopqrstuvwxyz'.split('').map((letter) => ` ${letter}`)];
+/** Longer suggestions are almost always book titles, not search phrases. */
+const MAX_KEYWORD_WORDS = 6;
+/** Suggestions that describe a different product than one paid book. */
+const OFF_PRODUCT_PATTERN = /\b(free|dvd|box(ed)? sets?|bundles?|mega set|book \d+|\d+-book)\b/;
+
+export function isUsableKeyword(phrase: string): boolean {
+  return phrase.split(/\s+/).length <= MAX_KEYWORD_WORDS && !OFF_PRODUCT_PATTERN.test(phrase);
+}
+
+/** Phrases to expand: each seed, its two-word tail, then the genre. Duplicates drop out. */
+export function expansionPhrases(seeds: string[], genre: string | null): string[] {
+  const phrases: string[] = [];
+  for (const seed of [...seeds, genre ?? '']) {
+    const normalized = seed.toLowerCase().trim().replace(/\s+/g, ' ');
+    if (!normalized) continue;
+    const words = normalized.split(' ');
+    phrases.push(normalized);
+    if (words.length > BACKOFF_WORDS) phrases.push(words.slice(-BACKOFF_WORDS).join(' '));
   }
-  return [...found].slice(0, limit);
+  return [...new Set(phrases)];
+}
+
+/**
+ * Expand seed phrases into candidate keywords using the suggestion provider.
+ * Candidates interleave across phrases so one broad phrase can't fill the whole limit.
+ */
+export async function expandSeeds(
+  seeds: string[],
+  provider: KeywordSuggestionProvider,
+  storefront: Storefront,
+  limit: number,
+  genre: string | null = null,
+): Promise<string[]> {
+  const perPhrase: string[][] = [];
+  for (const phrase of expansionPhrases(seeds, genre)) {
+    const found = new Set<string>([phrase]);
+    for (const suffix of SUFFIXES) {
+      const { suggestions } = await provider.suggest(`${phrase}${suffix}`, storefront);
+      for (const suggestion of suggestions) if (isUsableKeyword(suggestion)) found.add(suggestion);
+    }
+    perPhrase.push([...found]);
+  }
+  const candidates = new Set<string>();
+  for (let index = 0; candidates.size < limit && perPhrase.some((list) => index < list.length); index += 1) {
+    for (const list of perPhrase) if (index < list.length && candidates.size < limit) candidates.add(list[index]!);
+  }
+  return [...candidates];
 }
