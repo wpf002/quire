@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { type Manuscript, type ModelGateway, blockText } from '@quire/core';
 
 export const BLURB_SOURCE_CHARS = 60_000;
-export const BLURB_MAX_TOKENS = 1_500;
+// The model thinks before answering and that counts against this budget. 1,500 cut the JSON off mid-description.
+export const BLURB_MAX_TOKENS = 4_000;
 /** KDP description limit. */
 export const DESCRIPTION_MAX_CHARS = 4_000;
 
@@ -33,7 +34,14 @@ export async function generateBlurb(manuscript: Manuscript, gateway: ModelGatewa
   });
   const start = completion.text.indexOf('{');
   const end = completion.text.lastIndexOf('}');
-  const parsed = BlurbSchema.safeParse(JSON.parse(completion.text.slice(start, end + 1)));
+  if (start < 0 || end < start) throw new Error('Model returned no blurb. Try again.');
+  let json: unknown;
+  try {
+    json = JSON.parse(completion.text.slice(start, end + 1));
+  } catch {
+    throw new Error('Model returned an incomplete blurb. Try again.');
+  }
+  const parsed = BlurbSchema.safeParse(json);
   if (!parsed.success) throw new Error(`Model returned malformed copy: ${parsed.error.message}`);
   return parsed.data;
 }

@@ -51,7 +51,8 @@ describe('job failure policy', () => {
 
   // Regression: a "credit balance too low" 400 was retried three times and shown to the author as raw JSON.
   it('fails a refused model request at once with the provider message', () => {
-    const refused = toModelRequestError(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low."}}'));
+    const payload = '400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low."}}';
+    const refused = toModelRequestError(new Error(`${payload}: ${payload}`));
     expect(refused).toBeInstanceOf(ModelRequestError);
     expect(failureUpdate(refused, 1, false, now)).toEqual({ status: 'failed', finishedAt: now, error: 'Your credit balance is too low.', errorCode: null });
   });

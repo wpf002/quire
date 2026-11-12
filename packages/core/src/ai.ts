@@ -51,19 +51,21 @@ export class ModelRequestError extends Error {
 /** Turns a provider error like `400 {"error":{"message":"..."}}` into a status and a readable message. */
 export function toModelRequestError(error: unknown): unknown {
   if (!(error instanceof Error)) return error;
-  const match = /^(\d{3}) (.*)$/s.exec(error.message);
-  const status = (error as { status?: unknown }).status;
-  const code = typeof status === 'number' ? status : match ? Number(match[1]) : null;
-  if (code === null) return error;
-  let message = match ? match[2]! : error.message;
-  try {
-    const parsed: unknown = JSON.parse(message);
-    const inner = (parsed as { error?: { message?: unknown } }).error?.message;
-    if (typeof inner === 'string') message = inner;
-  } catch {
-    // Not JSON: keep the provider's text as is.
+  const { status, providerCode } = error as { status?: unknown; providerCode?: unknown };
+  const leading = /^(\d{3}) /.exec(error.message)?.[1];
+  const codeText = typeof status === 'number' ? String(status) : typeof providerCode === 'string' ? providerCode : leading;
+  if (codeText === undefined || !/^\d{3}$/.test(codeText)) return error;
+  // Flint repeats the payload ("400 {...}: 400 {...}"), so take the first quoted message instead of parsing the whole string.
+  const quoted = /"message":"((?:[^"\\]|\\.)*)"/.exec(error.message)?.[1];
+  let message = error.message;
+  if (quoted !== undefined) {
+    try {
+      message = JSON.parse(`"${quoted}"`) as string;
+    } catch {
+      message = quoted;
+    }
   }
-  return new ModelRequestError(code, message);
+  return new ModelRequestError(Number(codeText), message);
 }
 
 export async function createFlintGateway(apiKey: string | undefined, defaultModel: string): Promise<ModelGateway> {
