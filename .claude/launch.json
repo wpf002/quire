@@ -2,6 +2,8 @@
   "version": "0.0.1",
   "configurations": [
     { "name": "api", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@quire/api", "dev"], "port": 4000 },
-    { "name": "web", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@quire/web", "dev"], "port": 3000 }
+    { "name": "web", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@quire/web", "dev"], "port": 3000 },
+    { "name": "api-4100", "runtimeExecutable": "env", "runtimeArgs": ["QUIRE_API_PORT=4100", "pnpm", "--filter", "@quire/api", "dev"], "port": 4100 },
+    { "name": "web-4100", "runtimeExecutable": "env", "runtimeArgs": ["QUIRE_API_URL=http://localhost:4100", "pnpm", "--filter", "@quire/web", "dev"], "port": 3000 }
   ]
 }
