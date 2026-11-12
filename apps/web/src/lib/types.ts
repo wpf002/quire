@@ -166,6 +166,8 @@ export interface Job {
   status: JobStatus;
   attempts: number;
   error: string | null;
+  errorCode: string | null;
+  runAt: string;
   createdAt: string;
   finishedAt: string | null;
 }

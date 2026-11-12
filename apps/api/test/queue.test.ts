@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { AppContext } from '../src/context';
-import { claimJob, enqueue } from '../src/queue';
+import { DeferJobError, claimJob, enqueue, failureUpdate } from '../src/queue';
 import { resetDatabase, testContext } from './helpers';
 
 let context: AppContext;
@@ -32,5 +32,23 @@ describe('job queue', () => {
     await enqueue(context.prisma, 'sweep', {}, null);
     const [first, second] = await Promise.all([claimJob(context.prisma, 'a'), claimJob(context.prisma, 'b')]);
     expect([first, second].filter(Boolean)).toHaveLength(1);
+  });
+});
+
+describe('job failure policy', () => {
+  const now = new Date('2026-11-12T12:00:00Z');
+
+  // Regression: a robot check used to retry in 5s, which only extends Amazon's block.
+  it('requeues a deferred job after its delay with its code', () => {
+    const update = failureUpdate(new DeferJobError('amazon_blocked', 30 * 60_000, 'robot check'), 1, false, now);
+    expect(update).toEqual({ status: 'queued', error: 'robot check', errorCode: 'amazon_blocked', runAt: new Date('2026-11-12T12:30:00Z') });
+  });
+
+  it('fails a deferred job on its last attempt and keeps the code', () => {
+    expect(failureUpdate(new DeferJobError('amazon_blocked', 1_000, 'robot check'), 3, true, now)).toMatchObject({ status: 'failed', errorCode: 'amazon_blocked' });
+  });
+
+  it('backs ordinary errors off exponentially', () => {
+    expect(failureUpdate(new Error('boom'), 2, false, now)).toEqual({ status: 'queued', error: 'boom', errorCode: null, runAt: new Date('2026-11-12T12:00:10Z') });
   });
 });

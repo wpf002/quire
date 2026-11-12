@@ -8,6 +8,7 @@ import type { AppContext } from '../context';
 import { HttpError, conflict } from '../errors';
 import { fromJson, toJson } from '../json';
 import { PermanentJobError, enqueue } from '../queue';
+import { deferForAmazonBlock } from './amazon-block';
 import { latestDiscovery } from './discovery';
 import { latestManuscript } from './manuscripts';
 import { liveVersion, phrasesOf } from './metadata';
@@ -198,7 +199,7 @@ export async function queueRankCheck(context: AppContext, bookId: string, userId
   return enqueue(context.prisma, 'observe', { bookId }, userId);
 }
 
-/** Worker handler: refresh today's ranks for one book. Provider failures don't retry. */
+/** Worker handler: refresh today's ranks for one book. A robot check requeues it; other provider failures don't retry. */
 export async function runObserveJob(context: AppContext, payload: unknown): Promise<void> {
   const { bookId } = ObservePayloadSchema.parse(payload);
   const book = await context.prisma.book.findUnique({ where: { id: bookId } });
@@ -206,6 +207,7 @@ export async function runObserveJob(context: AppContext, payload: unknown): Prom
   try {
     await sweepBook(context, book, context.clock(), { replace: true });
   } catch (error) {
+    if (error instanceof RankProviderBlockedError) throw deferForAmazonBlock(error.message);
     if (error instanceof RankProviderError) throw new PermanentJobError(error.message);
     throw error;
   }

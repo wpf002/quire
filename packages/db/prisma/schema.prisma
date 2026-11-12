@@ -354,6 +354,8 @@ model Job {
   lockedAt    DateTime?
   lockedBy    String?
   error       String?
+  /// Machine-readable failure, e.g. amazon_blocked, so the UI can tell a deferral from a crash.
+  errorCode   String?
   createdAt   DateTime  @default(now())
   finishedAt  DateTime?
   user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)

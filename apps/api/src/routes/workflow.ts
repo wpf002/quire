@@ -235,7 +235,7 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
 
   app.get('/jobs/:id', async (request) => {
     const { user } = await requireUser(context, request);
-    const job = await context.prisma.job.findFirst({ where: { id: idParam(request), userId: user.id }, select: { id: true, type: true, status: true, attempts: true, error: true, createdAt: true, finishedAt: true } });
+    const job = await context.prisma.job.findFirst({ where: { id: idParam(request), userId: user.id }, select: { id: true, type: true, status: true, attempts: true, error: true, errorCode: true, runAt: true, createdAt: true, finishedAt: true } });
     if (!job) throw notFound('Job');
     return { job };
   });

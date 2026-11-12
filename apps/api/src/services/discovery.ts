@@ -1,5 +1,6 @@
 import { estimatePrintPages, manuscriptWordCount, newId } from '@quire/core';
 import {
+  AmazonBlockedError,
   type DiscoveryResult,
   type RecommendationPayload,
   pickDraftCategories,
@@ -12,6 +13,7 @@ import { z } from 'zod';
 import type { AppContext } from '../context';
 import { fromJson, toJson } from '../json';
 import { enqueue } from '../queue';
+import { deferForAmazonBlock } from './amazon-block';
 import { advanceStage } from './books';
 import { KDP_CATEGORY_SLOTS } from './metadata';
 import { requireManuscript } from './manuscripts';
@@ -40,7 +42,10 @@ export async function runDiscoveryJob(context: AppContext, payload: unknown): Pr
   const result = await runDiscovery(
     { title: book.title, subtitle: book.subtitle, genre: book.genre, seeds: request.seeds, storefront: request.storefront, expectedDailySales: request.expectedDailySales, candidateLimit: CANDIDATE_LIMIT },
     context.discovery,
-  );
+  ).catch((error: unknown) => {
+    if (error instanceof AmazonBlockedError) throw deferForAmazonBlock(error.message);
+    throw error;
+  });
   const pages = estimatePrintPages(manuscript);
   const fileSizeMb = (manuscriptWordCount(manuscript) * EPUB_BYTES_PER_WORD) / 1_000_000 + EPUB_OVERHEAD_MB;
   const ebook = recommendEbookPrice({ compMedianCents: result.compMedianPriceCents, fileSizeMb, seriesStarter: book.seriesStarter });

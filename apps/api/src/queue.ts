@@ -13,6 +13,27 @@ export class PermanentJobError extends Error {
     this.name = 'PermanentJobError';
   }
 }
+/** Retrying soon won't help, but later might: the job goes back on the queue after delayMs with this code. */
+export class DeferJobError extends Error {
+  constructor(
+    readonly code: string,
+    readonly delayMs: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'DeferJobError';
+  }
+}
+
+/** Failure data for a job that threw. Pure, so the retry policy is testable without a worker. */
+export function failureUpdate(error: unknown, attempts: number, final: boolean, now: Date) {
+  const message = error instanceof Error ? error.message : String(error);
+  const errorCode = error instanceof DeferJobError ? error.code : null;
+  if (final || error instanceof PermanentJobError) return { status: 'failed' as const, finishedAt: now, error: message, errorCode };
+  const delayMs = error instanceof DeferJobError ? error.delayMs : RETRY_BASE_MS * 2 ** (attempts - 1);
+  return { status: 'queued' as const, error: message, errorCode, runAt: new Date(now.getTime() + delayMs) };
+}
+
 const RETRY_BASE_MS = 5_000;
 const POLL_MS = 1_000;
 const STALE_LOCK_MS = 15 * 60_000;
@@ -101,17 +122,11 @@ export class Worker {
       if (!handler) throw new Error(`No handler for job type ${job.type}`);
       log.info('job started');
       await handler(job.payload, { id: job.id, attempt: job.attempts, final });
-      await this.prisma.job.update({ where: { id: job.id }, data: { status: 'done', finishedAt: new Date(), error: null } });
+      await this.prisma.job.update({ where: { id: job.id }, data: { status: 'done', finishedAt: new Date(), error: null, errorCode: null } });
       log.info('job done');
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       log.error({ err: error }, 'job failed');
-      await this.prisma.job.update({
-        where: { id: job.id },
-        data: final || error instanceof PermanentJobError
-          ? { status: 'failed', finishedAt: new Date(), error: message }
-          : { status: 'queued', error: message, runAt: new Date(Date.now() + RETRY_BASE_MS * 2 ** (job.attempts - 1)) },
-      });
+      await this.prisma.job.update({ where: { id: job.id }, data: failureUpdate(error, job.attempts, final, new Date()) });
     }
     return true;
   }
