@@ -41,7 +41,8 @@ export interface CategoryThresholds {
 
 export interface CategoryProvider {
   readonly name: string;
-  categories(genre: string, storefront: Storefront): Promise<CategoryThresholds[]>;
+  /** queries run most specific first, with the genre last. */
+  categories(queries: string[], storefront: Storefront): Promise<CategoryThresholds[]>;
 }
 
 export interface DiscoveryProviders {

@@ -51,7 +51,8 @@ export class SampleMarketProvider implements MarketDataProvider {
 
 export class SampleCategoryProvider implements CategoryProvider {
   readonly name = 'sample';
-  async categories(genre: string, storefront: Storefront): Promise<CategoryThresholds[]> {
+  async categories(queries: string[], storefront: Storefront): Promise<CategoryThresholds[]> {
+    const genre = queries.at(-1) ?? 'Fiction';
     const random = seeded(`categories:${genre}:${storefront}`);
     const root = storefront === 'kindle' ? 'Kindle Store › Kindle eBooks' : 'Books';
     const leaves = ['Contemporary', 'Small Town & Rural', 'Holidays', 'Series', 'Clean & Wholesome', 'Women’s Fiction', 'Literary', 'Short Reads'];

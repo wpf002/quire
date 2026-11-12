@@ -3,6 +3,9 @@ import { type KeywordScore, combineScore, competitionScore, demandScore, expandS
 import { type KeywordBox, packKeywordBoxes } from './metadata';
 import type { DiscoveryProviders, Storefront } from './providers';
 
+/** The best keywords describe this book more closely than its genre does, so they seed the category search. */
+const CATEGORY_KEYWORD_QUERIES = 2;
+
 export interface DiscoveryInput {
   title: string;
   subtitle: string | null;
@@ -43,7 +46,8 @@ export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryPr
     });
   }
   keywords.sort((left, right) => right.score - left.score);
-  const categories = rankCategories(await providers.categories.categories(input.genre, input.storefront), input.expectedDailySales);
+  const categoryQueries = [...new Set([...keywords.slice(0, CATEGORY_KEYWORD_QUERIES).map((score) => score.keyword), input.genre.toLowerCase()])];
+  const categories = rankCategories(await providers.categories.categories(categoryQueries, input.storefront), input.expectedDailySales);
   return {
     keywords,
     boxes: packKeywordBoxes(keywords, input.title, input.subtitle),

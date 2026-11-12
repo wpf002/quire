@@ -103,7 +103,7 @@ describe('AmazonCategoryProvider', () => {
       [`/dp/${listed[0]}`]: productPage('88'),
       [`/dp/${listed[9]}`]: productPage('1,904'),
     });
-    const categories = await new AmazonCategoryProvider(fetcher).categories('cozy mystery', 'kindle');
+    const categories = await new AmazonCategoryProvider(fetcher).categories(['cozy mystery'], 'kindle');
     expect(categories).toEqual([
       { path: 'Kindle Store › Kindle eBooks › Cozy Culinary Mysteries', bsrFirst: 88, bsrTenth: 1904 },
       { path: 'Books › Print Only', bsrFirst: 88, bsrTenth: 1904 },
@@ -112,12 +112,30 @@ describe('AmazonCategoryProvider', () => {
     expect(requested.filter((key) => key === `/dp/${listed[0]}`)).toHaveLength(1);
   });
 
+  it('seeds from each query and ranks lists shared by more seed books first', async () => {
+    const { fetcher } = fakePages({
+      'search:baker sleuth:digital-text': searchPage([searchResult('B0SEED0001', 'One', 40, '3.99')]),
+      'search:cozy mystery:digital-text': searchPage([searchResult('B0SEED0002', 'Two', 40, '3.99')]),
+      '/dp/B0SEED0001': productPage('5,120', [
+        ['4', 'digital-text', '2222', 'Only One'],
+        ['6', 'digital-text', '3333', 'Shared'],
+      ]),
+      '/dp/B0SEED0002': productPage('7,000', [['8', 'digital-text', '3333', 'Shared']]),
+      '/gp/bestsellers/digital-text/2222': listPage('Only One', listed),
+      '/gp/bestsellers/digital-text/3333': listPage('Shared', listed),
+      [`/dp/${listed[0]}`]: productPage('88'),
+      [`/dp/${listed[9]}`]: productPage('1,904'),
+    });
+    const categories = await new AmazonCategoryProvider(fetcher).categories(['baker sleuth', 'cozy mystery'], 'kindle');
+    expect(categories.map((category) => category.path)).toEqual(['Kindle Store › Kindle eBooks › Shared', 'Kindle Store › Kindle eBooks › Only One']);
+  });
+
   it('skips Kindle-store lists for the print storefront', async () => {
     const { fetcher } = fakePages({
       'search:cozy mystery:stripbooks': searchPage([searchResult('B0SEED0001', 'Seed', 40, '3.99')]),
       '/dp/B0SEED0001': productPage('5,120', [['4', 'digital-text', '6190492011', 'Cozy Culinary Mysteries']]),
     });
-    expect(await new AmazonCategoryProvider(fetcher).categories('cozy mystery', 'books')).toEqual([]);
+    expect(await new AmazonCategoryProvider(fetcher).categories(['cozy mystery'], 'books')).toEqual([]);
   });
 
   it('treats the bot-manager interstitial as a block', () => {
@@ -127,6 +145,6 @@ describe('AmazonCategoryProvider', () => {
 
   it('stops on a robot check', async () => {
     const { fetcher } = fakePages({ 'search:cozy mystery:digital-text': '<form action="/errors/validateCaptcha"></form>' });
-    await expect(new AmazonCategoryProvider(fetcher).categories('cozy mystery', 'kindle')).rejects.toBeInstanceOf(AmazonBlockedError);
+    await expect(new AmazonCategoryProvider(fetcher).categories(['cozy mystery'], 'kindle')).rejects.toBeInstanceOf(AmazonBlockedError);
   });
 });
