@@ -36,6 +36,25 @@ describe('runPass rules', () => {
   });
 });
 
+describe('proofread rules', () => {
+  const dialogue: Manuscript = {
+    title: 'T',
+    author: 'A',
+    chapters: [{ id: 'c1', title: 'One', blocks: [{ kind: 'paragraph', id: 'p1', runs: [{ text: '"You locked up?" he asked. “Yes.” she said. Flour.  She left.' }] }] }],
+  };
+
+  // Regression: `?" he asked` was flagged as a lowercase sentence start and capitalized.
+  it('leaves dialogue tags after a closing quote lowercase', async () => {
+    const result = await runPass('proofread', dialogue, unavailableForTest, models);
+    expect(result.edits.filter((edit) => edit.rule === 'sentence-case')).toEqual([]);
+  });
+
+  it('collapses a double space between sentences', async () => {
+    const result = await runPass('proofread', dialogue, unavailableForTest, models);
+    expect(result.edits.some((edit) => edit.rule === 'double-space' && edit.after.includes('Flour. She'))).toBe(true);
+  });
+});
+
 describe('runPass model', () => {
   it('drops model edits whose "before" text is not in the manuscript', async () => {
     const gateway: ModelGateway = {

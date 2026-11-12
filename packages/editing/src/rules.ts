@@ -80,7 +80,9 @@ export const PROOFREAD_RULES: TextRule[] = [
     if (['had', 'that'].includes(word.toLowerCase())) return null;
     return word;
   }),
-  regexRule('sentence-case', 'Sentence starts lowercase', /([.!?][”"’]?\s+)([a-z])/, (match) => `${match[1]}${match[2]!.toUpperCase()}`),
+  // After a closing quote the next word is usually a dialogue tag ("Ready?" he asked), so only bare punctuation counts.
+  regexRule('sentence-case', 'Sentence starts lowercase', /([.!?]\s+)([a-z])/, (match) => `${match[1]}${match[2]!.toUpperCase()}`),
+  regexRule('double-space', 'Extra space between words', /(\S) {2,}(?=\S)/, (match) => `${match[1]} `),
   regexRule('missing-space', 'Missing space after punctuation', /([a-z][,;])([A-Za-z])/, (match) => `${match[1]} ${match[2]}`),
 ];
 
