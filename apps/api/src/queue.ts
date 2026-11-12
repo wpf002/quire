@@ -1,6 +1,6 @@
 import { hostname } from 'node:os';
 import type { PrismaClient } from '@quire/db';
-import { newId } from '@quire/core';
+import { ModelRequestError, newId } from '@quire/core';
 import type { FastifyBaseLogger } from 'fastify';
 import { toJson } from './json';
 
@@ -29,7 +29,8 @@ export class DeferJobError extends Error {
 export function failureUpdate(error: unknown, attempts: number, final: boolean, now: Date) {
   const message = error instanceof Error ? error.message : String(error);
   const errorCode = error instanceof DeferJobError ? error.code : null;
-  if (final || error instanceof PermanentJobError) return { status: 'failed' as const, finishedAt: now, error: message, errorCode };
+  const permanent = error instanceof PermanentJobError || (error instanceof ModelRequestError && !error.retryable);
+  if (final || permanent) return { status: 'failed' as const, finishedAt: now, error: message, errorCode };
   const delayMs = error instanceof DeferJobError ? error.delayMs : RETRY_BASE_MS * 2 ** (attempts - 1);
   return { status: 'queued' as const, error: message, errorCode, runAt: new Date(now.getTime() + delayMs) };
 }

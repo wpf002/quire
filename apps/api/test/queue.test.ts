@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { AppContext } from '../src/context';
+import { ModelRequestError, toModelRequestError } from '@quire/core';
 import { DeferJobError, claimJob, enqueue, failureUpdate } from '../src/queue';
 import { resetDatabase, testContext } from './helpers';
 
@@ -46,6 +47,17 @@ describe('job failure policy', () => {
 
   it('fails a deferred job on its last attempt and keeps the code', () => {
     expect(failureUpdate(new DeferJobError('amazon_blocked', 1_000, 'robot check'), 3, true, now)).toMatchObject({ status: 'failed', errorCode: 'amazon_blocked' });
+  });
+
+  // Regression: a "credit balance too low" 400 was retried three times and shown to the author as raw JSON.
+  it('fails a refused model request at once with the provider message', () => {
+    const refused = toModelRequestError(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low."}}'));
+    expect(refused).toBeInstanceOf(ModelRequestError);
+    expect(failureUpdate(refused, 1, false, now)).toEqual({ status: 'failed', finishedAt: now, error: 'Your credit balance is too low.', errorCode: null });
+  });
+
+  it('retries a rate-limited model request', () => {
+    expect(failureUpdate(new ModelRequestError(429, 'slow down'), 1, false, now)).toMatchObject({ status: 'queued' });
   });
 
   it('backs ordinary errors off exponentially', () => {

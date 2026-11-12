@@ -33,6 +33,39 @@ interface FlintLike {
 
 export const MODEL_CALL_TIMEOUT_MS = 120_000;
 
+/** A model API call the provider refused. Rate limits, timeouts and server errors are worth retrying; other 4xx are not. */
+export class ModelRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ModelRequestError';
+  }
+
+  get retryable(): boolean {
+    return this.status === 408 || this.status === 429 || this.status >= 500;
+  }
+}
+
+/** Turns a provider error like `400 {"error":{"message":"..."}}` into a status and a readable message. */
+export function toModelRequestError(error: unknown): unknown {
+  if (!(error instanceof Error)) return error;
+  const match = /^(\d{3}) (.*)$/s.exec(error.message);
+  const status = (error as { status?: unknown }).status;
+  const code = typeof status === 'number' ? status : match ? Number(match[1]) : null;
+  if (code === null) return error;
+  let message = match ? match[2]! : error.message;
+  try {
+    const parsed: unknown = JSON.parse(message);
+    const inner = (parsed as { error?: { message?: unknown } }).error?.message;
+    if (typeof inner === 'string') message = inner;
+  } catch {
+    // Not JSON: keep the provider's text as is.
+  }
+  return new ModelRequestError(code, message);
+}
+
 export async function createFlintGateway(apiKey: string | undefined, defaultModel: string): Promise<ModelGateway> {
   if (!apiKey) return unavailableGateway('no-key');
   let client: FlintLike;
@@ -50,10 +83,14 @@ export async function createFlintGateway(apiKey: string | undefined, defaultMode
     available: true,
     async complete(request) {
       const signal = AbortSignal.timeout(MODEL_CALL_TIMEOUT_MS);
-      const outcome = await client.generate(
-        { system: request.system, prompt: request.prompt, cache: request.cacheSystem ? { system: true } : undefined },
-        { model: request.model, maxTokens: request.maxTokens, signal },
-      );
+      const outcome = await client
+        .generate(
+          { system: request.system, prompt: request.prompt, cache: request.cacheSystem ? { system: true } : undefined },
+          { model: request.model, maxTokens: request.maxTokens, signal },
+        )
+        .catch((error: unknown) => {
+          throw toModelRequestError(error);
+        });
       return { text: outcome.text, model: request.model, tokens: outcome.usage };
     },
   };
