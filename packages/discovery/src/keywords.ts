@@ -92,6 +92,40 @@ export function namesAnAuthor(keyword: string, authors: Iterable<string>): boole
   return false;
 }
 
+/** Words that say what kind of book it is, not which series. */
+const GENERIC_WORDS = new Set(['a', 'an', 'the', 'and', 'of', 'in', 'with', 'cozy', 'mystery', 'mysteries', 'series', 'book', 'books', 'novel', 'novels']);
+/** One distinctive word ("quilting") is a theme. Two or more that match a series tag ("ivy creek") are a series name. */
+const MIN_SERIES_NAME_WORDS = 2;
+
+function distinctiveWords(text: string): string {
+  return normalizeName(text)
+    .split(' ')
+    .filter((word) => word && !GENERIC_WORDS.has(word))
+    .join(' ');
+}
+
+/** Series tags from result titles: "(A Lexy Baker Cozy Mystery Book 3)" or "Title: Ivy Creek Cozy Mystery Book 5". */
+export function seriesTags(titles: Iterable<string>): string[] {
+  const tags: string[] = [];
+  for (const title of titles) {
+    for (const match of title.matchAll(/\(([^)]+)\)/g)) tags.push(match[1]!);
+    const colon = title.indexOf(':');
+    if (colon >= 0) tags.push(title.slice(colon + 1).replace(/\([^)]*\)/g, ''));
+  }
+  return tags;
+}
+
+/** KDP rejects other books' series and character names in keywords. A phrase made only of the book's own seed words is never a foreign name. */
+export function namesASeries(keyword: string, tags: Iterable<string>, ownWords: Iterable<string> = []): boolean {
+  const name = distinctiveWords(keyword);
+  const nameWords = name.split(' ').filter(Boolean);
+  if (nameWords.length < MIN_SERIES_NAME_WORDS) return false;
+  const own = new Set([...ownWords].flatMap((phrase) => normalizeName(phrase).split(' ')));
+  if (nameWords.every((word) => own.has(word))) return false;
+  for (const tag of tags) if (` ${distinctiveWords(tag)} `.includes(` ${name} `)) return true;
+  return false;
+}
+
 /** Phrases to expand: each seed, its two-word tail, then the genre. Duplicates drop out. */
 export function expansionPhrases(seeds: string[], genre: string | null): string[] {
   const phrases: string[] = [];

@@ -23,25 +23,21 @@ function words(text: string): string[] {
  * Pack scored phrases into 7 boxes of 50 characters. Words already in the title or subtitle
  * are dropped (Amazon indexes those already), banned terms are skipped, and no word repeats.
  */
-export function packKeywordBoxes(scored: KeywordScore[], title: string, subtitle: string | null): KeywordBox[] {
+export function packKeywordBoxes(scored: KeywordScore[], title: string, subtitle: string | null, fallback: string[] = []): KeywordBox[] {
   const covered = new Set(words(`${title} ${subtitle ?? ''}`).filter((word) => !STOP_WORDS.has(word)));
   const used = new Set<string>();
-  const packed: Array<{ keyword: string; fragment: string }> = [];
-  for (const { keyword } of [...scored].sort((left, right) => right.score - left.score)) {
-    if (BANNED_TERMS.some((term) => keyword.includes(term))) continue;
-    const fresh = words(keyword).filter((word) => !covered.has(word) && !used.has(word) && !STOP_WORDS.has(word));
-    if (fresh.length === 0) continue;
-    const fragment = fresh.join(' ');
-    if (fragment.length > KDP_KEYWORD_BOX_CHARS) continue;
-    fresh.forEach((word) => used.add(word));
-    packed.push({ keyword, fragment });
-  }
-
   // Box text holds only the new words. Phrases keep the full search phrase, which is what gets rank-tracked.
   const boxes: KeywordBox[] = Array.from({ length: KDP_KEYWORD_BOXES }, (_, index) => ({ index, text: '', phrases: [] }));
-  for (const { keyword, fragment } of packed) {
+  // Scored phrases first, best first. Unscored fallback phrases only add words the scored ones didn't.
+  const ordered = [...[...scored].sort((left, right) => right.score - left.score).map((score) => score.keyword), ...fallback];
+  for (const keyword of ordered) {
+    if (BANNED_TERMS.some((term) => keyword.includes(term))) continue;
+    const fresh = [...new Set(words(keyword))].filter((word) => !covered.has(word) && !used.has(word) && !STOP_WORDS.has(word));
+    if (fresh.length === 0) continue;
+    const fragment = fresh.join(' ');
     const box = boxes.find((candidate) => (candidate.text ? candidate.text.length + 1 : 0) + fragment.length <= KDP_KEYWORD_BOX_CHARS);
-    if (!box) break;
+    if (!box) continue;
+    fresh.forEach((word) => used.add(word));
     box.text = box.text ? `${box.text} ${fragment}` : fragment;
     box.phrases.push(keyword);
   }

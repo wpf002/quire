@@ -95,11 +95,11 @@ describe('AmazonCategoryProvider', () => {
       'search:cozy mystery:digital-text': searchPage([searchResult('B0SEED0001', 'Seed', 40, '3.99')]),
       '/dp/B0SEED0001': productPage('5,120', [
         ['4', 'digital-text', '6190492011', 'Cozy Culinary Mysteries'],
-        ['9', 'books', '9999', 'Print Only'],
+        ['9', 'books', '9999', 'Print Mysteries'],
         ['2', 'digital-text', '1111', 'Thin List'],
       ]),
       '/gp/bestsellers/digital-text/6190492011': listPage('Cozy Culinary Mysteries', listed),
-      '/gp/bestsellers/books/9999': listPage('Print Only', listed),
+      '/gp/bestsellers/books/9999': listPage('Print Mysteries', listed),
       '/gp/bestsellers/digital-text/1111': listPage('Thin List', asinRange('T', 4)),
       [`/dp/${listed[0]}`]: productPage('88'),
       [`/dp/${listed[9]}`]: productPage('1,904'),
@@ -107,7 +107,7 @@ describe('AmazonCategoryProvider', () => {
     const categories = await new AmazonCategoryProvider(fetcher).categories(['cozy mystery'], 'kindle');
     expect(categories).toEqual([
       { path: 'Kindle Store › Kindle eBooks › Cozy Culinary Mysteries', bsrFirst: 88, bsrTenth: 1904 },
-      { path: 'Books › Print Only', bsrFirst: 88, bsrTenth: 1904 },
+      { path: 'Books › Print Mysteries', bsrFirst: 88, bsrTenth: 1904 },
     ]);
     // Product pages are cached across lists, so the shared #1 and #10 load once.
     expect(requested.filter((key) => key === `/dp/${listed[0]}`)).toHaveLength(1);
@@ -118,17 +118,34 @@ describe('AmazonCategoryProvider', () => {
       'search:baker sleuth:digital-text': searchPage([searchResult('B0SEED0001', 'One', 40, '3.99')]),
       'search:cozy mystery:digital-text': searchPage([searchResult('B0SEED0002', 'Two', 40, '3.99')]),
       '/dp/B0SEED0001': productPage('5,120', [
-        ['4', 'digital-text', '2222', 'Only One'],
+        ['4', 'digital-text', '2222', 'Baker Sleuths'],
         ['6', 'digital-text', '3333', 'Shared'],
       ]),
       '/dp/B0SEED0002': productPage('7,000', [['8', 'digital-text', '3333', 'Shared']]),
-      '/gp/bestsellers/digital-text/2222': listPage('Only One', listed),
+      '/gp/bestsellers/digital-text/2222': listPage('Baker Sleuths', listed),
       '/gp/bestsellers/digital-text/3333': listPage('Shared', listed),
       [`/dp/${listed[0]}`]: productPage('88'),
       [`/dp/${listed[9]}`]: productPage('1,904'),
     });
     const categories = await new AmazonCategoryProvider(fetcher).categories(['baker sleuth', 'cozy mystery'], 'kindle');
-    expect(categories.map((category) => category.path)).toEqual(['Kindle Store › Kindle eBooks › Shared', 'Kindle Store › Kindle eBooks › Only One']);
+    expect(categories.map((category) => category.path)).toEqual(['Kindle Store › Kindle eBooks › Shared', 'Kindle Store › Kindle eBooks › Baker Sleuths']);
+  });
+
+  // Regression: one seed book listed in "Family Conflict Resolution", and the cozy mystery run recommended it.
+  it('drops a list only one seed book ranks in when it shares no topic with the queries', async () => {
+    const { fetcher } = fakePages({
+      'search:cozy mystery:digital-text': searchPage([searchResult('B0SEED0001', 'Seed', 40, '3.99')]),
+      '/dp/B0SEED0001': productPage('5,120', [
+        ['4', 'digital-text', '2222', 'Family Conflict Resolution'],
+        ['6', 'digital-text', '3333', 'Cozy Culinary Mysteries'],
+      ]),
+      '/gp/bestsellers/digital-text/2222': listPage('Family Conflict Resolution', listed),
+      '/gp/bestsellers/digital-text/3333': listPage('Cozy Culinary Mysteries', listed),
+      [`/dp/${listed[0]}`]: productPage('88'),
+      [`/dp/${listed[9]}`]: productPage('1,904'),
+    });
+    const categories = await new AmazonCategoryProvider(fetcher).categories(['cozy mystery'], 'kindle');
+    expect(categories.map((category) => category.path)).toEqual(['Kindle Store › Kindle eBooks › Cozy Culinary Mysteries']);
   });
 
   it('skips Kindle-store lists for the print storefront', async () => {

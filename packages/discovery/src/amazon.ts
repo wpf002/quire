@@ -103,6 +103,25 @@ const LIST_ROOT: Record<string, string> = { 'digital-text': 'Kindle Store › Ki
 /** Bestseller stores that count for each storefront. Kindle books also list print-store categories. */
 const STORES: Record<Storefront, string[]> = { kindle: ['digital-text', 'books'], books: ['books'] };
 
+/** A list only one seed book ranks in must also share a topic word with the queries. One book's odd listing isn't a fit. */
+const SHARED_BY_SEED_BOOKS = 2;
+
+/** Lowercase words with a plain plural stripped, so "Mysteries" matches "mystery". */
+function topicWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z]+/)
+      .filter((word) => word.length > 2)
+      .map((word) => word.replace(/ies$/, 'y').replace(/s$/, '')),
+  );
+}
+
+export function sharesTopic(listName: string, queries: string[]): boolean {
+  const queryWords = topicWords(queries.join(' '));
+  return [...topicWords(listName)].some((word) => queryWords.has(word));
+}
+
 /**
  * Categories from the bestseller lists that the top books for the book's keywords rank in.
  * Lists more seed books share come first. For each list it reads the #1 and #10 books' overall BSR from their product pages.
@@ -137,7 +156,9 @@ export class AmazonCategoryProvider implements CategoryProvider {
         else lists.set(link.node, { store: link.store, node: link.node, name: link.category, seedBooks: 1 });
       }
     }
-    const shared = [...lists.values()].sort((left, right) => right.seedBooks - left.seedBooks).slice(0, MAX_CATEGORIES);
+    const shared = [...lists.values()]
+      .filter((list) => list.seedBooks >= SHARED_BY_SEED_BOOKS || sharesTopic(list.name, queries))
+      .sort((left, right) => right.seedBooks - left.seedBooks).slice(0, MAX_CATEGORIES);
 
     const thresholds: CategoryThresholds[] = [];
     for (const list of shared) {

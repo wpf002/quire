@@ -12,6 +12,7 @@ import {
   expandSeeds,
   expansionPhrases,
   isUsableKeyword,
+  namesASeries,
   namesAnAuthor,
   packKeywordBoxes,
   paperbackRoyaltyCents,
@@ -20,6 +21,7 @@ import {
   rankCategories,
   recommendPaperbackPrice,
   runDiscovery,
+  seriesTags,
   validateMetadata,
 } from '../src';
 
@@ -153,6 +155,26 @@ describe('keywords', () => {
     expect(namesAnAuthor('k m morgan cozy mystery', authors)).toBe(true);
     expect(namesAnAuthor('cozy mystery cherry pie', authors)).toBe(false);
     expect(namesAnAuthor('michaela connelly street', authors)).toBe(false);
+  });
+
+  // Regression: a live run packed "nora blackwell", "lexy baker" and "ivy creek" (other books' series) into the boxes.
+  it('flags keywords that name a series from the top result titles', () => {
+    const tags = seriesTags(['Fudge and Fatality (A Lexy Baker Cozy Mystery Book 3)', 'Murder at the Mill: Ivy Creek Cozy Mystery Book 5', 'Quilted to Death']);
+    const own = ['small town baker sleuth', 'cozy mystery'];
+    expect(namesASeries('lexy baker cozy mystery series', tags, own)).toBe(true);
+    expect(namesASeries('ivy creek cozy mystery series', tags, own)).toBe(true);
+    expect(namesASeries('quilting cozy mystery series', tags, own)).toBe(false);
+    expect(namesASeries('cozy mystery london england', tags, own)).toBe(false);
+    expect(namesASeries('small town baker cozy mystery', ['A Small Town Baker Mystery'], own)).toBe(false);
+  });
+
+  // Regression: a live run left boxes 6 and 7 empty once the scored phrases ran out of new words.
+  it('fills boxes the scored phrases leave empty from unscored suggestions', () => {
+    const scored = [{ keyword: 'cozy mystery with cats', score: 0.9, demand: 1, competition: 0.2, resultCount: 1, topSalesPerDay: 1, source: 's' }];
+    const fallback = ['cozy mystery halloween', 'cozy mystery christmas', 'cozy mystery cats', 'cozy mystery scotland'];
+    const boxes = packKeywordBoxes(scored, 'Crumbs', null, fallback);
+    expect(boxes[0]!.phrases).toEqual(['cozy mystery with cats', 'cozy mystery halloween', 'cozy mystery christmas', 'cozy mystery scotland']);
+    expect(boxes[0]!.text).toBe('cozy mystery cats halloween christmas scotland');
   });
 
   it('expands with letter suffixes and interleaves phrases', async () => {
