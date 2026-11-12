@@ -41,6 +41,7 @@ export class SampleMarketProvider implements MarketDataProvider {
     const resultCount = Math.round(200 + random() * 60_000);
     const topTitles = Array.from({ length: 10 }, (_, index) => ({
       title: `${keyword} title ${index + 1}`,
+      authors: [`Author ${index + 1}`],
       bsr: Math.round(500 * 10 ** (random() * 3.2)),
       reviews: Math.round(random() * 4_000),
       priceCents: [299, 399, 499, 999][Math.floor(random() * 4)] ?? 399,

@@ -17,6 +17,7 @@ import {
 const searchResult = (asin: string, title: string, ratings: number, price: string, sponsored = false) =>
   `<div role="listitem" data-asin="${asin}" data-component-type="s-search-result" class="s-result-item s-asin${sponsored ? ' AdHolder' : ''}">` +
   `<h2 aria-label="${title}" class="a-size-medium"><span>${title}</span></h2>` +
+  `<span class="a-size-base">by </span><a class="a-size-base a-link-normal s-underline-text" href="/Jen-Pitts/e/B081J2RKH4?ref=sr_ntt_srch_lnk_1">Jen Pitts</a>` +
   `<a aria-label="${ratings.toLocaleString('en-US')} ratings" href="#"></a><span class="a-price"><span class="a-offscreen">$0.00</span></span>` +
   `<span class="a-price"><span class="a-offscreen">$${price}</span></span></div>`;
 const searchPage = (results: string[]) =>
@@ -55,7 +56,7 @@ function fakePages(pages: Record<string, string>) {
 describe('amazon page parsers', () => {
   it('reads organic results with ratings and price, skipping sponsored slots', () => {
     const html = searchPage([searchResult('B0SPONSOR1', 'Ad', 5, '0.99', true), searchResult('B0AAAAAAA1', 'Crumbs &amp; Clues', 1567, '4.99')]);
-    expect(organicResults(html)).toEqual([{ asin: 'B0AAAAAAA1', title: 'Crumbs & Clues', reviews: 1567, priceCents: 499 }]);
+    expect(organicResults(html)).toEqual([{ asin: 'B0AAAAAAA1', title: 'Crumbs & Clues', reviews: 1567, priceCents: 499, authors: ['Jen Pitts'] }]);
     expect(searchResultCount(html)).toBe(3000);
   });
 
@@ -76,12 +77,12 @@ describe('AmazonMarketProvider', () => {
   it('returns result count and the top organic titles', async () => {
     const { fetcher } = fakePages({ 'search:cozy mystery:digital-text': searchPage([searchResult('B0AAAAAAA1', 'One', 12, '2.99')]) });
     const market = await new AmazonMarketProvider(fetcher).market('cozy mystery', 'kindle');
-    expect(market).toEqual({ keyword: 'cozy mystery', resultCount: 3000, topTitles: [{ title: 'One', bsr: null, reviews: 12, priceCents: 299 }] });
+    expect(market).toEqual({ keyword: 'cozy mystery', resultCount: 3000, topTitles: [{ title: 'One', authors: ['Jen Pitts'], bsr: null, reviews: 12, priceCents: 299 }] });
   });
 
   it('scores competition from ratings when there is no BSR', () => {
-    const weak = competitionScore({ keyword: 'k', resultCount: 3000, topTitles: [{ title: 'a', bsr: null, reviews: 10, priceCents: null }] });
-    const strong = competitionScore({ keyword: 'k', resultCount: 3000, topTitles: [{ title: 'a', bsr: null, reviews: 5000, priceCents: null }] });
+    const weak = competitionScore({ keyword: 'k', resultCount: 3000, topTitles: [{ title: 'a', authors: [], bsr: null, reviews: 10, priceCents: null }] });
+    const strong = competitionScore({ keyword: 'k', resultCount: 3000, topTitles: [{ title: 'a', authors: [], bsr: null, reviews: 5000, priceCents: null }] });
     expect(strong.competition).toBeGreaterThan(weak.competition);
   });
 });

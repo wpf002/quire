@@ -88,7 +88,7 @@ export class AmazonMarketProvider implements MarketDataProvider {
     const html = await this.pages.get(searchUrl(keyword, storefront));
     const topTitles = organicResults(html)
       .slice(0, TOP_TITLES)
-      .map((result) => ({ title: result.title, bsr: null, reviews: result.reviews, priceCents: result.priceCents }));
+      .map((result) => ({ title: result.title, authors: result.authors, bsr: null, reviews: result.reviews, priceCents: result.priceCents }));
     return { keyword, resultCount: searchResultCount(html), topTitles };
   }
 }

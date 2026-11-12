@@ -12,6 +12,7 @@ import {
   expandSeeds,
   expansionPhrases,
   isUsableKeyword,
+  namesAnAuthor,
   packKeywordBoxes,
   paperbackRoyaltyCents,
   pickDraftCategories,
@@ -136,6 +137,22 @@ describe('keywords', () => {
     expect(isUsableKeyword('cozy mystery box set')).toBe(false);
     expect(isUsableKeyword('cozy mystery book 1')).toBe(false);
     expect(isUsableKeyword('the case of the missing cupcake a cozy mystery')).toBe(false);
+  });
+
+  // Regression: a live run packed "prime reading", "unlimited" and "top 100" into the boxes, which KDP rejects.
+  it('rejects Amazon program and format terms', () => {
+    for (const phrase of ['cozy mystery prime reading', 'cozy mystery kindle unlimited', 'top 100 cozy mysteries', 'cozy mystery paperbacks']) {
+      expect(isUsableKeyword(phrase)).toBe(false);
+    }
+  });
+
+  // Regression: a live run kept "cozy mysteries michael connelly" and packed the name into a box.
+  it('flags keywords that name an author from the top results', () => {
+    const authors = ['Michael Connelly', 'K.M. Morgan', 'Cher'];
+    expect(namesAnAuthor('cozy mysteries michael connelly', authors)).toBe(true);
+    expect(namesAnAuthor('k m morgan cozy mystery', authors)).toBe(true);
+    expect(namesAnAuthor('cozy mystery cherry pie', authors)).toBe(false);
+    expect(namesAnAuthor('michaela connelly street', authors)).toBe(false);
   });
 
   it('expands with letter suffixes and interleaves phrases', async () => {

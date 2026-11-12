@@ -108,7 +108,11 @@ export interface SearchResult {
   title: string;
   reviews: number | null;
   priceCents: number | null;
+  authors: string[];
 }
+
+/** Byline links point at an author page: /Name/e/ASIN or /stores/Name/author/ASIN. */
+const AUTHOR_LINK = /<a[^>]*href="[^"]*\/(?:e|author)\/[A-Z0-9]{10}[^"]*"[^>]*>([^<]+)<\/a>/g;
 
 /** Organic results on one search page, in order. Sponsored slots (AdHolder) are skipped. */
 export function organicResults(html: string): SearchResult[] {
@@ -130,6 +134,7 @@ export function organicResults(html: string): SearchResult[] {
       title: title ? plainText(title) : asin,
       reviews: reviews ? Number(reviews.replace(/,/g, '')) : null,
       priceCents: price === undefined ? null : Math.round(price * 100),
+      authors: [...new Set([...body.matchAll(AUTHOR_LINK)].map((match) => plainText(match[1]!)))],
     });
   });
   return results;

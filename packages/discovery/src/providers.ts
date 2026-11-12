@@ -16,6 +16,7 @@ export interface KeywordSuggestionProvider {
 
 export interface CompetingTitle {
   title: string;
+  authors: string[];
   bsr: number | null;
   reviews: number | null;
   priceCents: number | null;

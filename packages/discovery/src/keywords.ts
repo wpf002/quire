@@ -72,10 +72,24 @@ const SUFFIXES = [' ', ...'abcdefghijklmnopqrstuvwxyz'.split('').map((letter) =>
 /** Longer suggestions are almost always book titles, not search phrases. */
 const MAX_KEYWORD_WORDS = 6;
 /** Suggestions that describe a different product than one paid book. */
-const OFF_PRODUCT_PATTERN = /\b(free|dvd|box(ed)? sets?|bundles?|mega set|book \d+|\d+-book)\b/;
+const OFF_PRODUCT_PATTERN = /\b(free|dvd|box(ed)? sets?|bundles?|mega set|book \d+|\d+-book|paperbacks?|prime reading|(kindle )?unlimited|top \d+)\b/;
 
 export function isUsableKeyword(phrase: string): boolean {
   return phrase.split(/\s+/).length <= MAX_KEYWORD_WORDS && !OFF_PRODUCT_PATTERN.test(phrase);
+}
+
+function normalizeName(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/** KDP rejects other authors' names in keywords. Names come from the bylines of each keyword's top results. */
+export function namesAnAuthor(keyword: string, authors: Iterable<string>): boolean {
+  const phrase = ` ${normalizeName(keyword)} `;
+  for (const author of authors) {
+    const name = normalizeName(author);
+    if (name.includes(' ') && phrase.includes(` ${name} `)) return true;
+  }
+  return false;
 }
 
 /** Phrases to expand: each seed, its two-word tail, then the genre. Duplicates drop out. */
