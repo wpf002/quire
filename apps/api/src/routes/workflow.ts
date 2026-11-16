@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { type ChecklistItem, type DisclosureReport } from '@quire/compliance';
 import { EXPORT_TARGETS, PASS_KINDS, TRIM_SIZES } from '@quire/core';
+import { LAUNCH_RECOMMENDATION_KINDS } from '@quire/discovery';
 import { z } from 'zod';
 import { requireUser } from '../auth';
 import type { AppContext } from '../context';
@@ -121,7 +122,7 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
     const { book } = await owned(request);
     const [run, recommendations] = await Promise.all([
       latestDiscovery(context, book.id),
-      context.prisma.recommendation.findMany({ where: { bookId: book.id, kind: { in: ['keywords', 'categories', 'price-ebook', 'price-paperback'] } }, orderBy: { createdAt: 'desc' }, take: 4 }),
+      context.prisma.recommendation.findMany({ where: { bookId: book.id, kind: { in: [...LAUNCH_RECOMMENDATION_KINDS] } }, orderBy: { createdAt: 'desc' }, take: 4 }),
     ]);
     return { run, recommendations };
   });

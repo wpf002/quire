@@ -91,7 +91,7 @@ function Workspace() {
             <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => goTo(item.id)}>
               {item.label}
               {item.id === 'edits' && detail.pendingEdits > 0 && <span className="tab-count num">{detail.pendingEdits}</span>}
-              {item.id === 'rank' && detail.openRecommendations > 0 && <span className="tab-count accent num">{detail.openRecommendations}</span>}
+              {item.id === 'rank' && detail.openRankRecommendations > 0 && <span className="tab-count accent num">{detail.openRankRecommendations}</span>}
             </button>
           ))}
         </nav>

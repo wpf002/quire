@@ -1,6 +1,7 @@
 import { estimatePrintPages, manuscriptWordCount, newId } from '@quire/core';
 import {
   AmazonBlockedError,
+  LAUNCH_RECOMMENDATION_KINDS,
   type DiscoveryResult,
   type RecommendationPayload,
   pickDraftCategories,
@@ -68,7 +69,7 @@ export async function runDiscoveryJob(context: AppContext, payload: unknown): Pr
 
   await context.prisma.$transaction(async (tx) => {
     // A fresh run replaces open launch recommendations from the last run.
-    await tx.recommendation.updateMany({ where: { bookId, status: 'open', kind: { in: ['keywords', 'categories', 'price-ebook', 'price-paperback'] } }, data: { status: 'dismissed' } });
+    await tx.recommendation.updateMany({ where: { bookId, status: 'open', kind: { in: [...LAUNCH_RECOMMENDATION_KINDS] } }, data: { status: 'dismissed' } });
     await tx.discoveryRun.create({ data: { id: newId('disc'), bookId, input: toJson(request), result: toJson(result), sources: result.sources } });
     await tx.recommendation.createMany({
       data: payloads.map((entry) => ({ id: newId('rec'), bookId, kind: entry.payload.kind, payload: toJson(entry.payload), rationale: entry.rationale, dataSources: result.sources })),

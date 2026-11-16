@@ -1,5 +1,5 @@
 import { newId } from '@quire/core';
-import { keywordBoxText, type MetadataIssue, type RecommendationPayload, validateMetadata } from '@quire/discovery';
+import { LAUNCH_RECOMMENDATION_KINDS, keywordBoxText, type MetadataIssue, type RecommendationPayload, validateMetadata } from '@quire/discovery';
 import type { MetadataVersion, PrismaClient } from '@quire/db';
 import { MAX_TRACKED_KEYWORDS } from '@quire/tracking';
 import { z } from 'zod';
@@ -103,7 +103,7 @@ export async function applyDraft(context: AppContext, userId: string, bookId: st
     const version = await tx.metadataVersion.update({ where: { id: draft.id }, data: { appliedAt: now } });
     await tx.book.update({ where: { id: bookId }, data: { ...(firstPublish ? { publishedAt: now } : {}), ...(asin ? { asin } : {}) } });
     if (firstPublish) {
-      await tx.recommendation.updateMany({ where: { bookId, status: 'open', kind: { in: ['keywords', 'categories', 'price-ebook', 'price-paperback'] } }, data: { status: 'applied', appliedAt: now } });
+      await tx.recommendation.updateMany({ where: { bookId, status: 'open', kind: { in: [...LAUNCH_RECOMMENDATION_KINDS] } }, data: { status: 'applied', appliedAt: now } });
     }
     return version;
   });

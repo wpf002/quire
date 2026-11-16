@@ -83,7 +83,7 @@ export interface BookDetail {
   book: Book;
   manuscript: { version: number; chapters: ChapterSummary[] } | null;
   pendingEdits: number;
-  openRecommendations: number;
+  openRankRecommendations: number;
   uploads: UploadRow[];
 }
 

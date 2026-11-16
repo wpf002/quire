@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { KDP_EXTENT_OPTIONS } from '@quire/compliance';
 import { TRIM_SIZES, blockText, countWords, newId } from '@quire/core';
+import { LAUNCH_RECOMMENDATION_KINDS } from '@quire/discovery';
 import { IngestError, MAX_UPLOAD_BYTES, detectFormat, ingestManuscript } from '@quire/ingest';
 import { z } from 'zod';
 import { requireUser } from '../auth';
@@ -66,9 +67,9 @@ export function bookRoutes(app: FastifyInstance, context: AppContext): void {
     const { user } = await requireUser(context, request);
     const book = await loadOwnedBook(context.prisma, user.id, idParam(request));
     const latest = await latestManuscript(context.prisma, book.id);
-    const [pendingEdits, openRecommendations, uploads] = await Promise.all([
+    const [pendingEdits, openRankRecommendations, uploads] = await Promise.all([
       context.prisma.edit.count({ where: { bookId: book.id, status: 'pending' } }),
-      context.prisma.recommendation.count({ where: { bookId: book.id, status: 'open' } }),
+      context.prisma.recommendation.count({ where: { bookId: book.id, status: 'open', kind: { notIn: [...LAUNCH_RECOMMENDATION_KINDS] } } }),
       context.prisma.upload.findMany({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' }, select: { id: true, filename: true, format: true, bytes: true, createdAt: true } }),
     ]);
     return {
@@ -84,7 +85,7 @@ export function bookRoutes(app: FastifyInstance, context: AppContext): void {
           }
         : null,
       pendingEdits,
-      openRecommendations,
+      openRankRecommendations,
       uploads,
     };
   });

@@ -148,6 +148,8 @@ describe('self-serve flow', () => {
     const draft = metadata.draft as { keywordBoxes: string[]; categories: string[] };
     expect(draft.keywordBoxes.length).toBe(7);
     expect(draft.categories.length).toBeGreaterThan(0);
+    // Regression: launch recs live on the Metadata tab, so they must not light up the Rank tab badge.
+    expect((await client.request('GET', `/books/${bookId}`)).json().openRankRecommendations).toBe(0);
 
     // Regression: applying a launch rec before publish edits the draft instead of failing with 409.
     const discovery = (await client.request('GET', `/books/${bookId}/discovery`)).json();
