@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
-import { CATEGORY_SEPARATOR, count, dollars, moment } from '@/lib/format';
+import { CATEGORY_SEPARATOR, count, defaultSeedPhrases, dollars, moment } from '@/lib/format';
 import { waitForJob } from '@/lib/jobs';
 import type { CategoryFitResult, DiscoveryView, MetadataVersion, MetadataView, PricingRecommendation } from '@/lib/types';
 import { useAction } from '@/lib/use-action';
@@ -54,7 +54,7 @@ function leaf(path: string): string {
 
 function DiscoveryForm({ onDone }: { onDone: () => Promise<void> }) {
   const { bookId, detail } = useWorkspace();
-  const [seeds, setSeeds] = useState(detail.book.genre);
+  const [seeds, setSeeds] = useState(() => defaultSeedPhrases(detail.book.subtitle, detail.book.genre));
   const [storefront, setStorefront] = useState<'kindle' | 'books'>('kindle');
   const [sales, setSales] = useState('3');
   const action = useAction();

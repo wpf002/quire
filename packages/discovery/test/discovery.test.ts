@@ -21,7 +21,7 @@ import {
   rankCategories,
   recommendPaperbackPrice,
   runDiscovery,
-  seriesTags,
+  titleTags,
   validateMetadata,
 } from '../src';
 
@@ -159,13 +159,21 @@ describe('keywords', () => {
 
   // Regression: a live run packed "nora blackwell", "lexy baker" and "ivy creek" (other books' series) into the boxes.
   it('flags keywords that name a series from the top result titles', () => {
-    const tags = seriesTags(['Fudge and Fatality (A Lexy Baker Cozy Mystery Book 3)', 'Murder at the Mill: Ivy Creek Cozy Mystery Book 5', 'Quilted to Death']);
+    const tags = titleTags(['Fudge and Fatality (A Lexy Baker Cozy Mystery Book 3)', 'Murder at the Mill: Ivy Creek Cozy Mystery Book 5', 'Quilted to Death']);
     const own = ['small town baker sleuth', 'cozy mystery'];
     expect(namesASeries('lexy baker cozy mystery series', tags, own)).toBe(true);
     expect(namesASeries('ivy creek cozy mystery series', tags, own)).toBe(true);
     expect(namesASeries('quilting cozy mystery series', tags, own)).toBe(false);
     expect(namesASeries('cozy mystery london england', tags, own)).toBe(false);
     expect(namesASeries('small town baker cozy mystery', ['A Small Town Baker Mystery'], own)).toBe(false);
+  });
+
+  // Regression: a live run scored "mystery at nightshade farm" and "mystery at seagrave hall", which are other books' titles.
+  it('flags keywords that repeat a top result title', () => {
+    const tags = titleTags(['Mystery at Nightshade Farm', 'Mystery at Seagrave Hall: A Cozy Mystery (Hall Mysteries Book 1)']);
+    expect(namesASeries('mystery at nightshade farm', tags, ['mystery'])).toBe(true);
+    expect(namesASeries('mystery at seagrave hall', tags, ['mystery'])).toBe(true);
+    expect(namesASeries('mystery at the bakery', tags, ['mystery'])).toBe(false);
   });
 
   // Regression: a live run left boxes 6 and 7 empty once the scored phrases ran out of new words.

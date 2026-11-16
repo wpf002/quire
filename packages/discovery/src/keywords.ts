@@ -104,18 +104,20 @@ function distinctiveWords(text: string): string {
     .join(' ');
 }
 
-/** Series tags from result titles: "(A Lexy Baker Cozy Mystery Book 3)" or "Title: Ivy Creek Cozy Mystery Book 5". */
-export function seriesTags(titles: Iterable<string>): string[] {
+/** Names from result titles: the title itself, "(A Lexy Baker Cozy Mystery Book 3)" and "Title: Ivy Creek Cozy Mystery Book 5". */
+export function titleTags(titles: Iterable<string>): string[] {
   const tags: string[] = [];
   for (const title of titles) {
     for (const match of title.matchAll(/\(([^)]+)\)/g)) tags.push(match[1]!);
-    const colon = title.indexOf(':');
-    if (colon >= 0) tags.push(title.slice(colon + 1).replace(/\([^)]*\)/g, ''));
+    const withoutSeries = title.replace(/\([^)]*\)/g, '');
+    const colon = withoutSeries.indexOf(':');
+    tags.push(colon >= 0 ? withoutSeries.slice(0, colon) : withoutSeries);
+    if (colon >= 0) tags.push(withoutSeries.slice(colon + 1));
   }
   return tags;
 }
 
-/** KDP rejects other books' series and character names in keywords. A phrase made only of the book's own seed words is never a foreign name. */
+/** KDP rejects other books' titles, series and character names in keywords. A phrase made only of the book's own seed words is never a foreign name. */
 export function namesASeries(keyword: string, tags: Iterable<string>, ownWords: Iterable<string> = []): boolean {
   const name = distinctiveWords(keyword);
   const nameWords = name.split(' ').filter(Boolean);

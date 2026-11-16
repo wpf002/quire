@@ -1,5 +1,5 @@
 import { type CategoryFitResult, rankCategories } from './categories';
-import { type KeywordScore, combineScore, competitionScore, demandScore, expandSeeds, median, namesASeries, namesAnAuthor, seriesTags } from './keywords';
+import { type KeywordScore, combineScore, competitionScore, demandScore, expandSeeds, median, namesASeries, namesAnAuthor, titleTags } from './keywords';
 import { type KeywordBox, packKeywordBoxes } from './metadata';
 import type { DiscoveryProviders, Storefront } from './providers';
 
@@ -57,7 +57,7 @@ export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryPr
       source: `${providers.suggestions.name} + ${providers.market.name}`,
     });
   }
-  const tags = seriesTags(titles);
+  const tags = titleTags(titles);
   const ownWords = [...input.seeds, input.genre];
   const allowed = (phrase: string) => !namesAnAuthor(phrase, authors) && !namesASeries(phrase, tags, ownWords);
   const usable = keywords.filter((score) => allowed(score.keyword)).sort((left, right) => right.score - left.score);

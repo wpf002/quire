@@ -28,4 +28,13 @@ export function since(iso: string, now = Date.now()): string {
 }
 
 /** Category paths arrive as "A › B › C" from the sample provider and "A > B > C" from others. */
+const LEADING_ARTICLE = /^(a|an|the)\s+/i;
+
+/** The subtitle usually names the niche ("A Cozy Bakery Mystery"), which seeds narrower phrases than the bare genre. */
+export function defaultSeedPhrases(subtitle: string | null, genre: string): string {
+  const niche = subtitle?.trim().replace(LEADING_ARTICLE, '').toLowerCase() ?? '';
+  const phrases = [niche, genre.toLowerCase()].filter(Boolean);
+  return [...new Set(phrases)].join(', ');
+}
+
 export const CATEGORY_SEPARATOR = /\s[›>]\s/;
