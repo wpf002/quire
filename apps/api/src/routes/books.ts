@@ -10,7 +10,7 @@ import { idParam, parseWith } from '../http';
 import { toJson } from '../json';
 import { PLANS } from '../plans';
 import { advanceStage, loadOwnedBook } from '../services/books';
-import { latestManuscript, requireManuscript, saveManuscript } from '../services/manuscripts';
+import { latestManuscript, requireManuscript, saveUploadedManuscript } from '../services/manuscripts';
 
 const CreateSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -133,7 +133,7 @@ export function bookRoutes(app: FastifyInstance, context: AppContext): void {
     const uploadId = newId('upl');
     const storagePath = await context.storage.put(`uploads/${book.id}/${uploadId}.${format}`, buffer);
     await context.prisma.upload.create({ data: { id: uploadId, bookId: book.id, filename, format, bytes: buffer.length, storagePath } });
-    const version = await saveManuscript(context.prisma, book.id, manuscript, `upload:${format}`);
+    const version = await saveUploadedManuscript(context.prisma, book.id, manuscript, format);
     await advanceStage(context.prisma, book.id, 'edit');
     return reply.code(201).send({ version, chapters: manuscript.chapters.length });
   });

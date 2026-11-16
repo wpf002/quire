@@ -5,6 +5,7 @@ import { type DragEvent, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { bytes, count, dollars, moment } from '@/lib/format';
 import { waitForJob } from '@/lib/jobs';
+import { currentStructuralPass } from '@/lib/passes';
 import type { Block, Manuscript, Pass, Run } from '@/lib/types';
 import { useAction } from '@/lib/use-action';
 import { useResource } from '@/lib/use-resource';
@@ -102,11 +103,11 @@ export function Dropzone({ compact = false }: { compact?: boolean }) {
 }
 
 function PassPanel() {
-  const { bookId, reload, goTo } = useWorkspace();
+  const { bookId, detail, reload, goTo } = useWorkspace();
   const passes = useResource<{ passes: Pass[] }>(`/books/${bookId}/passes`);
   const [running, setRunning] = useState<PassKind | null>(null);
   const action = useAction();
-  const latestStructural = passes.data?.passes.find((pass) => pass.kind === 'structural' && pass.status === 'done' && pass.notes && pass.notes.length > 0);
+  const latestStructural = currentStructuralPass(passes.data?.passes ?? [], detail.uploads[0]?.createdAt);
 
   async function start(kind: PassKind) {
     setRunning(kind);

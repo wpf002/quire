@@ -96,6 +96,22 @@ describe('spend caps', () => {
     expect(await context.prisma.spendEntry.count()).toBe(0);
   });
 
+  it('drops pending edits when a new file replaces the manuscript', async () => {
+    const client = new TestClient(app);
+    await client.signup('replace@example.test');
+    expect((await client.request('PATCH', '/account', { spendCapCentsDaily: 0 })).status).toBe(200);
+    const bookId = await newBook(client);
+    expect((await client.upload(`/books/${bookId}/upload`, 'salt-road.md', SAMPLE_MANUSCRIPT)).status).toBe(201);
+    expect((await client.request('POST', `/books/${bookId}/passes`, { kind: 'copyedit' })).status).toBe(202);
+    await worker.drain();
+    const before = (await client.request('GET', `/books/${bookId}/edits?status=pending`)).json().edits as unknown[];
+    expect(before.length).toBeGreaterThan(0);
+
+    expect((await client.upload(`/books/${bookId}/upload`, 'salt-road.md', SAMPLE_MANUSCRIPT)).status).toBe(201);
+    const after = (await client.request('GET', `/books/${bookId}/edits?status=pending`)).json().edits as unknown[];
+    expect(after).toHaveLength(0);
+  });
+
   it('refuses a cap above the plan ceiling', async () => {
     const client = new TestClient(app);
     await client.signup('ceiling@example.test');

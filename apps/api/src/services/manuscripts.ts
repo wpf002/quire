@@ -34,6 +34,13 @@ export async function saveManuscript(prisma: PrismaClient, bookId: string, manus
   return version;
 }
 
+/** A new upload gets new block ids, so edits still pending against the old file can never apply. */
+export async function saveUploadedManuscript(prisma: PrismaClient, bookId: string, manuscript: Manuscript, format: string): Promise<number> {
+  const version = await saveManuscript(prisma, bookId, manuscript, `upload:${format}`);
+  await prisma.edit.deleteMany({ where: { bookId, status: 'pending' } });
+  return version;
+}
+
 export interface TextChange {
   id: string;
   blockId: string;
