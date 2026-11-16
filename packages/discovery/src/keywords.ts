@@ -117,6 +117,32 @@ export function titleTags(titles: Iterable<string>): string[] {
   return tags;
 }
 
+/** Lowercase words with a plain plural stripped, so "Mysteries" matches "mystery". */
+export function topicWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z]+/)
+      .filter((word) => word.length > 2)
+      .map((word) => word.replace(/ies$/, 'y').replace(/s$/, '')),
+  );
+}
+
+/** Words that appear in any seed but say nothing about the niche. */
+const NICHE_STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'book', 'serie', 'novel', 'fiction']);
+
+/** Seed words beyond the genre ("cozy", "bakery"). Empty when the seeds only restate the genre. */
+export function nicheWords(seeds: string[], genre: string): Set<string> {
+  const genreWords = topicWords(genre);
+  return new Set([...topicWords(seeds.join(' '))].filter((word) => !genreWords.has(word) && !NICHE_STOP_WORDS.has(word)));
+}
+
+/** A phrase fits the niche when it shares a niche word. With no niche words every phrase fits. */
+export function fitsNiche(phrase: string, niche: Set<string>): boolean {
+  if (niche.size === 0) return true;
+  return [...topicWords(phrase)].some((word) => niche.has(word));
+}
+
 /** KDP rejects other books' titles, series and character names in keywords. A phrase made only of the book's own seed words is never a foreign name. */
 export function namesASeries(keyword: string, tags: Iterable<string>, ownWords: Iterable<string> = []): boolean {
   const name = distinctiveWords(keyword);
@@ -128,7 +154,10 @@ export function namesASeries(keyword: string, tags: Iterable<string>, ownWords: 
   return false;
 }
 
-/** Phrases to expand: each seed, its two-word tail, then the genre. Duplicates drop out. */
+/** A three-word seed ("cozy bakery mystery") also expands its outer pair ("cozy mystery"), which autocompletes to far more niche phrases. */
+const OUTER_PAIR_WORDS = 3;
+
+/** Phrases to expand: each seed, its two-word tail, the outer pair of a three-word seed, then the genre. Duplicates drop out. */
 export function expansionPhrases(seeds: string[], genre: string | null): string[] {
   const phrases: string[] = [];
   for (const seed of [...seeds, genre ?? '']) {
@@ -137,6 +166,7 @@ export function expansionPhrases(seeds: string[], genre: string | null): string[
     const words = normalized.split(' ');
     phrases.push(normalized);
     if (words.length > BACKOFF_WORDS) phrases.push(words.slice(-BACKOFF_WORDS).join(' '));
+    if (words.length === OUTER_PAIR_WORDS) phrases.push(`${words[0]} ${words[2]}`);
   }
   return [...new Set(phrases)];
 }

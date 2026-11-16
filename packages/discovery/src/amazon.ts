@@ -11,6 +11,7 @@ import {
   searchResultCount,
 } from './amazon-pages';
 import { getJson } from './http';
+import { topicWords } from './keywords';
 import type {
   CategoryProvider,
   CategoryThresholds,
@@ -105,17 +106,6 @@ const STORES: Record<Storefront, string[]> = { kindle: ['digital-text', 'books']
 
 /** A list only one seed book ranks in must also share a topic word with the queries. One book's odd listing isn't a fit. */
 const SHARED_BY_SEED_BOOKS = 2;
-
-/** Lowercase words with a plain plural stripped, so "Mysteries" matches "mystery". */
-function topicWords(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z]+/)
-      .filter((word) => word.length > 2)
-      .map((word) => word.replace(/ies$/, 'y').replace(/s$/, '')),
-  );
-}
 
 export function sharesTopic(listName: string, queries: string[]): boolean {
   const queryWords = topicWords(queries.join(' '));

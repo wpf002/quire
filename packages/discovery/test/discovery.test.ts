@@ -11,9 +11,11 @@ import {
   estimateDailySales,
   expandSeeds,
   expansionPhrases,
+  fitsNiche,
   isUsableKeyword,
   namesASeries,
   namesAnAuthor,
+  nicheWords,
   packKeywordBoxes,
   paperbackRoyaltyCents,
   pickDraftCategories,
@@ -131,6 +133,8 @@ describe('keywords', () => {
       'baker sleuth',
       'cozy mystery',
     ]);
+    // Regression: "cozy bakery mystery" alone autocompleted to five phrases, all made of subtitle words, and filled one box.
+    expect(expansionPhrases(['cozy bakery mystery'], 'Mystery')).toEqual(['cozy bakery mystery', 'bakery mystery', 'cozy mystery', 'mystery']);
   });
 
   it('drops free, box set, numbered and title-length suggestions', () => {
@@ -200,6 +204,42 @@ describe('keywords', () => {
 
   it('flags over-length metadata', () => {
     expect(validateMetadata({ title: 't', subtitle: null, description: 'x'.repeat(4_001), keywords: ['a'.repeat(51)] })).toHaveLength(2);
+  });
+});
+
+// Regression: seeding "cozy bakery mystery, mystery" packed "graphic novels kids", "national parks" and "manga" from the bare genre.
+describe('niche filter', () => {
+  it('keeps phrases that share a seed word beyond the genre', () => {
+    const niche = nicheWords(['cozy bakery mystery', 'mystery'], 'Mystery');
+    expect([...niche].sort()).toEqual(['bakery', 'cozy']);
+    expect(fitsNiche('cozy bakery mysteries', niche)).toBe(true);
+    expect(fitsNiche('bakeries mystery series', niche)).toBe(true);
+    expect(fitsNiche('mystery graphic novels for kids 9-12', niche)).toBe(false);
+    expect(fitsNiche('mystery ranch forager', niche)).toBe(false);
+  });
+
+  it('keeps every phrase when the seeds only restate the genre', () => {
+    const niche = nicheWords(['mystery books'], 'Mystery');
+    expect(niche.size).toBe(0);
+    expect(fitsNiche('mystery comics', niche)).toBe(true);
+  });
+
+  it('drops off-niche suggestions before scoring', async () => {
+    const mixed: KeywordSuggestionProvider = {
+      name: 'mixed',
+      async suggest(prefix) {
+        const all = ['mystery comics', 'mystery bakery cozy', 'mystery guest', 'mystery cozy cats'];
+        return { prefix, suggestions: all.filter((value) => value.startsWith(prefix.trim())) };
+      },
+    };
+    const result = await runDiscovery(
+      { title: 'Crumbs', subtitle: null, genre: 'Mystery', seeds: ['cozy bakery mystery', 'mystery'], storefront: 'kindle', expectedDailySales: 3, candidateLimit: 10 },
+      { suggestions: mixed, market: new SampleMarketProvider(), categories: new SampleCategoryProvider() },
+    );
+    const phrases = result.keywords.map((score) => score.keyword);
+    expect(phrases).toContain('mystery bakery cozy');
+    expect(phrases).not.toContain('mystery comics');
+    expect(phrases).not.toContain('mystery guest');
   });
 });
 

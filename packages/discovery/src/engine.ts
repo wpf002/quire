@@ -1,5 +1,5 @@
 import { type CategoryFitResult, rankCategories } from './categories';
-import { type KeywordScore, combineScore, competitionScore, demandScore, expandSeeds, median, namesASeries, namesAnAuthor, titleTags } from './keywords';
+import { type KeywordScore, combineScore, competitionScore, demandScore, expandSeeds, fitsNiche, median, namesASeries, namesAnAuthor, nicheWords, titleTags } from './keywords';
 import { type KeywordBox, packKeywordBoxes } from './metadata';
 import type { DiscoveryProviders, Storefront } from './providers';
 
@@ -30,7 +30,9 @@ export interface DiscoveryResult {
 }
 
 export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryProviders): Promise<DiscoveryResult> {
-  const pool = await expandSeeds(input.seeds, providers.suggestions, input.storefront, Math.max(input.candidateLimit, SUGGESTION_POOL_LIMIT), input.genre);
+  const niche = nicheWords(input.seeds, input.genre);
+  const expanded = await expandSeeds(input.seeds, providers.suggestions, input.storefront, Math.max(input.candidateLimit, SUGGESTION_POOL_LIMIT), input.genre);
+  const pool = expanded.filter((phrase) => fitsNiche(phrase, niche));
   const candidates = pool.slice(0, input.candidateLimit);
   const keywords: KeywordScore[] = [];
   const compPrices: number[] = [];
