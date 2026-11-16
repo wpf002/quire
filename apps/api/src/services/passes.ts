@@ -29,6 +29,8 @@ export async function runPassJob(context: AppContext, payload: unknown, final: b
     // Copyedit and proofread overlap, and a rule and the model can flag the same typo. The author reviews each fix once.
     const pending = await context.prisma.edit.findMany({ where: { bookId: pass.bookId, status: 'pending' }, select: { blockId: true, before: true, after: true } });
     const edits = dropDuplicateEdits(result.edits, pending, blockTexts(manuscript));
+    const pairIds = new Map<string, string>();
+    const pairIdFor = (key: string) => pairIds.get(key) ?? pairIds.set(key, newId('pair')).get(key)!;
     await context.prisma.$transaction([
       context.prisma.edit.createMany({
         data: edits.map((edit) => ({
@@ -43,6 +45,7 @@ export async function runPassJob(context: AppContext, payload: unknown, final: b
           rule: edit.rule,
           source: edit.source,
           aiRole: edit.aiRole,
+          pairId: edit.pairKey ? pairIdFor(edit.pairKey) : null,
         })),
       }),
       context.prisma.pass.update({

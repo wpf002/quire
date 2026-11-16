@@ -4,8 +4,8 @@ import type { EditProposal } from './types';
 export interface TextRule {
   id: string;
   reason: string;
-  /** Returns [before, after] fragments, each `before` unique enough to locate in the block. */
-  find(text: string): Array<[string, string]>;
+  /** Returns [before, after] fragments, each `before` unique enough to locate in the block. Fixes sharing a pair number are decided together. */
+  find(text: string): Array<[before: string, after: string, pair?: number]>;
 }
 
 const CONTEXT_CHARS = 12;
@@ -46,6 +46,9 @@ function curlQuotes(text: string): string {
     .replace(/'/g, '’');
 }
 
+const OPEN_DOUBLE = '“';
+const CLOSE_DOUBLE = '”';
+
 const COMMON_MISSPELLINGS: Record<string, string> = {
   recieve: 'receive', recieved: 'received', seperate: 'separate', definately: 'definitely', occured: 'occurred',
   untill: 'until', wierd: 'weird', accomodate: 'accommodate', acheive: 'achieve', beleive: 'believe',
@@ -59,10 +62,24 @@ export const COPYEDIT_RULES: TextRule[] = [
     id: 'smart-quotes',
     reason: 'Straight quotes to typographic quotes',
     // One edit per quote mark, so a quote fix never spans another rule's fix in the same sentence.
+    // The two marks of a double-quote pair share a pair number so the author can't keep one and drop the other.
     find(text) {
       const curled = curlQuotes(text);
-      const found: Array<[string, string]> = [];
-      for (let index = 0; index < text.length; index += 1) if (curled[index] !== text[index]) found.push(withContext(text, index, 1, curled[index]!));
+      const found: Array<[string, string, number?]> = [];
+      let openPair: number | null = null;
+      for (let index = 0; index < text.length; index += 1) {
+        if (curled[index] === text[index]) continue;
+        const [before, after] = withContext(text, index, 1, curled[index]!);
+        if (curled[index] === OPEN_DOUBLE) {
+          openPair = index;
+          found.push([before, after, index]);
+        } else if (curled[index] === CLOSE_DOUBLE && openPair !== null) {
+          found.push([before, after, openPair]);
+          openPair = null;
+        } else {
+          found.push([before, after]);
+        }
+      }
       return found;
     },
   },
@@ -103,10 +120,11 @@ function rulesForChapter(chapter: Chapter, rules: TextRule[], onBlock: () => voi
     onBlock();
     const text = blockText(block);
     for (const rule of rules) {
-      for (const [before, after] of rule.find(text)) {
+      for (const [before, after, pair] of rule.find(text)) {
         edits.push({
           chapterId: chapter.id, blockId: block.id, before, after,
           reason: rule.reason, rule: rule.id, source: 'rule', aiRole: 'none',
+          ...(pair === undefined ? {} : { pairKey: `${block.id}:${rule.id}:${pair}` }),
         });
       }
     }

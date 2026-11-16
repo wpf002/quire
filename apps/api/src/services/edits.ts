@@ -17,8 +17,19 @@ export interface DecisionResult {
   version: number | null;
 }
 
+/** Paired edits follow the decision made on either one. A partner keeps its own text. */
+async function withPartners(context: AppContext, bookId: string, decisions: EditDecision[]): Promise<EditDecision[]> {
+  const decided = await context.prisma.edit.findMany({ where: { id: { in: decisions.map((decision) => decision.id) }, bookId, pairId: { not: null } }, select: { id: true, pairId: true } });
+  if (decided.length === 0) return decisions;
+  const actionByPair = new Map(decided.map((edit) => [edit.pairId!, decisions.find((decision) => decision.id === edit.id)!.action]));
+  const partners = await context.prisma.edit.findMany({ where: { bookId, status: 'pending', pairId: { in: [...actionByPair.keys()] } }, select: { id: true, pairId: true } });
+  const listed = new Set(decisions.map((decision) => decision.id));
+  return [...decisions, ...partners.filter((edit) => !listed.has(edit.id)).map((edit) => ({ id: edit.id, action: actionByPair.get(edit.pairId!)! }))];
+}
+
 /** Apply every accepted edit into one new manuscript version, so a bulk accept is one revision. */
-export async function decideEdits(context: AppContext, bookId: string, decisions: EditDecision[]): Promise<DecisionResult> {
+export async function decideEdits(context: AppContext, bookId: string, requested: EditDecision[]): Promise<DecisionResult> {
+  const decisions = await withPartners(context, bookId, requested);
   const ids = decisions.map((decision) => decision.id);
   const edits = await context.prisma.edit.findMany({ where: { id: { in: ids }, bookId, status: 'pending' } });
   if (edits.length !== new Set(ids).size) throw badRequest('Some edits are not pending on this book');

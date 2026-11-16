@@ -188,6 +188,8 @@ model Edit {
   status        EditStatus @default(pending)
   authorRevised Boolean    @default(false)
   decidedAt     DateTime?
+  /// Edits that must be decided together, such as the two marks of a quote pair.
+  pairId        String?
   pass          Pass       @relation(fields: [passId], references: [id], onDelete: Cascade)
   book          Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
 

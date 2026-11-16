@@ -13,6 +13,8 @@ export interface EditProposal {
   rule: string | null;
   source: EditSource;
   aiRole: AiRole;
+  /** Edits sharing a key are decided together. Unique within one pass. */
+  pairKey?: string;
 }
 
 export interface StructuralNote {

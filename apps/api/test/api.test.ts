@@ -112,6 +112,26 @@ describe('spend caps', () => {
     expect(after).toHaveLength(0);
   });
 
+  // Regression: rejecting one mark of a quote pair while accepting the other left mismatched quotes.
+  it('decides both marks of a quote pair together', async () => {
+    const client = new TestClient(app);
+    await client.signup('quotes@example.test');
+    expect((await client.request('PATCH', '/account', { spendCapCentsDaily: 0 })).status).toBe(200);
+    const bookId = await newBook(client);
+    const manuscript = '# Quotes\n\n## One\n\nShe looked up. "Ready," she said, and the door closed behind her.\n';
+    expect((await client.upload(`/books/${bookId}/upload`, 'quotes.md', manuscript)).status).toBe(201);
+    await client.request('POST', `/books/${bookId}/passes`, { kind: 'copyedit' });
+    await worker.drain();
+    const pending = (await client.request('GET', `/books/${bookId}/edits?status=pending`)).json().edits as Array<{ id: string; rule: string | null }>;
+    const quotes = pending.filter((edit) => edit.rule === 'smart-quotes');
+    expect(quotes).toHaveLength(2);
+
+    const decided = (await client.request('POST', `/books/${bookId}/edits/decide`, { decisions: [{ id: quotes[0]!.id, action: 'reject' }] })).json();
+    expect([...(decided.rejected as string[])].sort()).toEqual(quotes.map((edit) => edit.id).sort());
+    const remaining = (await client.request('GET', `/books/${bookId}/edits?status=pending`)).json().edits as Array<{ rule: string | null }>;
+    expect(remaining.filter((edit) => edit.rule === 'smart-quotes')).toHaveLength(0);
+  });
+
   it('refuses a cap above the plan ceiling', async () => {
     const client = new TestClient(app);
     await client.signup('ceiling@example.test');

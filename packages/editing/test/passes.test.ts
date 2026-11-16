@@ -45,6 +45,14 @@ describe('copyedit rules', () => {
     expect(quotes.every((edit) => edit.before.length < 30)).toBe(true);
     expect(quotes.map((edit) => edit.after)).toEqual(['She said “hello" -- th', ' said "hello” -- then lef']);
   });
+
+  // Regression: rejecting an opening quote while accepting its closing mark left “hello" in the book.
+  it('gives the two marks of a quote pair the same pair key', async () => {
+    const result = await runPass('copyedit', manuscript, unavailableForTest, models);
+    const keys = result.edits.filter((edit) => edit.rule === 'smart-quotes').map((edit) => edit.pairKey);
+    expect(keys[0]).toBeDefined();
+    expect(keys[1]).toBe(keys[0]);
+  });
 });
 
 describe('proofread rules', () => {
