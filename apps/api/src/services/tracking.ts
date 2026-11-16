@@ -184,6 +184,14 @@ const ACTIVE_JOB = ['queued', 'running'] as const;
 const ObservePayloadSchema = z.object({ bookId: z.string() });
 
 /** Queue an on-demand rank check. Reuses a check already in flight; refuses a new one inside the cooldown. */
+/** What the client needs to show a job's state. */
+export const JOB_VIEW_SELECT = { id: true, type: true, status: true, attempts: true, error: true, errorCode: true, runAt: true, createdAt: true, finishedAt: true } satisfies Prisma.JobSelect;
+
+/** The newest rank check, so the Rank tab can show a requeued robot check after the page reloads. */
+export async function latestRankCheck(context: AppContext, bookId: string) {
+  return context.prisma.job.findFirst({ where: { type: 'observe', payload: { path: ['bookId'], equals: bookId } }, orderBy: { createdAt: 'desc' }, select: JOB_VIEW_SELECT });
+}
+
 export async function queueRankCheck(context: AppContext, bookId: string, userId: string): Promise<string> {
   const forBook = { type: 'observe', payload: { path: ['bookId'], equals: bookId } } satisfies Prisma.JobWhereInput;
   const active = await context.prisma.job.findFirst({ where: { ...forBook, status: { in: [...ACTIVE_JOB] } } });

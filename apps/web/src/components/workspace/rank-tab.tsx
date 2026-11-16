@@ -2,7 +2,7 @@
 
 import { type MouseEvent, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
-import { waitForJob } from '@/lib/jobs';
+import { retryLaterMessage, waitForJob } from '@/lib/jobs';
 import { count, day } from '@/lib/format';
 import type { RankView, Recommendation, RecommendationOutcome } from '@/lib/types';
 import { useAction } from '@/lib/use-action';
@@ -294,6 +294,7 @@ export function RankTab() {
 
   const open = view.recommendations.filter((rec) => rec.status === 'open' && !LAUNCH_KINDS.includes(rec.kind));
   const hasPoints = view.series.some((series) => series.points.length > 0);
+  const blockedNotice = view.rankCheck ? retryLaterMessage(view.rankCheck) : null;
 
   return (
     <div className="split split-wide">
@@ -315,7 +316,7 @@ export function RankTab() {
             </button>
           </span>
         </div>
-        {action.error && <div className="form-error">{action.error}</div>}
+        {(action.error ?? blockedNotice) && <div className="form-error">{action.error ?? blockedNotice}</div>}
         {hasPoints ? (
           <RankChart view={view} />
         ) : (

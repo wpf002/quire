@@ -16,7 +16,7 @@ import { decideEdits } from '../services/edits';
 import { createExport, downloadName } from '../services/exports';
 import { DraftPatchSchema, applyDraft, applyRecommendation, draftVersion, issuesFor, patchDraft } from '../services/metadata';
 import { queuePass } from '../services/passes';
-import { MAX_SIMULATED_DAYS, queueRankCheck, simulateDays } from '../services/tracking';
+import { JOB_VIEW_SELECT, MAX_SIMULATED_DAYS, latestRankCheck, queueRankCheck, simulateDays } from '../services/tracking';
 
 const PassSchema = z.object({ kind: z.enum(PASS_KINDS) });
 const DecisionsSchema = z.object({
@@ -167,13 +167,14 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
 
   app.get('/books/:id/rank', async (request) => {
     const { book } = await owned(request);
-    const [keywords, ranks, bsr, versions, recommendations, categoryRanks] = await Promise.all([
+    const [keywords, ranks, bsr, versions, recommendations, categoryRanks, rankCheck] = await Promise.all([
       context.prisma.trackedKeyword.findMany({ where: { bookId: book.id, active: true }, orderBy: { createdAt: 'asc' } }),
       context.prisma.rankObservation.findMany({ where: { bookId: book.id, provider: context.ranks.name }, orderBy: { observedAt: 'asc' }, select: { keyword: true, rank: true, observedAt: true } }),
       context.prisma.bsrObservation.findMany({ where: { bookId: book.id, provider: context.ranks.name }, orderBy: { observedAt: 'asc' }, select: { bsr: true, observedAt: true, provider: true } }),
       context.prisma.metadataVersion.findMany({ where: { bookId: book.id, appliedAt: { not: null } }, orderBy: { appliedAt: 'asc' }, select: { id: true, version: true, appliedAt: true, recommendationId: true } }),
       context.prisma.recommendation.findMany({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } }),
       context.prisma.categoryRankObservation.findMany({ where: { bookId: book.id, provider: context.ranks.name }, orderBy: { observedAt: 'asc' }, select: { category: true, rank: true, observedAt: true } }),
+      latestRankCheck(context, book.id),
     ]);
     const categoryNames = [...new Set(categoryRanks.map((entry) => entry.category))];
     const categories = categoryNames.map((category) => ({
@@ -193,6 +194,7 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
       categories,
       changes: versions,
       recommendations,
+      rankCheck,
     };
   });
 
@@ -236,7 +238,7 @@ export function workflowRoutes(app: FastifyInstance, context: AppContext): void 
 
   app.get('/jobs/:id', async (request) => {
     const { user } = await requireUser(context, request);
-    const job = await context.prisma.job.findFirst({ where: { id: idParam(request), userId: user.id }, select: { id: true, type: true, status: true, attempts: true, error: true, errorCode: true, runAt: true, createdAt: true, finishedAt: true } });
+    const job = await context.prisma.job.findFirst({ where: { id: idParam(request), userId: user.id }, select: JOB_VIEW_SELECT });
     if (!job) throw notFound('Job');
     return { job };
   });

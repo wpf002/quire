@@ -325,6 +325,7 @@ export interface RankView {
   categories: Array<{ category: string; points: Array<{ at: string; rank: number }> }>;
   changes: Array<{ id: string; version: number; appliedAt: string; recommendationId: string | null }>;
   recommendations: Recommendation[];
+  rankCheck: Job | null;
 }
 
 export interface PreflightCheck {

@@ -190,6 +190,8 @@ describe('self-serve flow', () => {
     expect(checked.status).toBe('done');
     const baseline = (await client.request('GET', `/books/${bookId}/rank`)).json();
     expect((baseline.bsr as unknown[]).length).toBe(1);
+    // Regression: the Rank tab lost a requeued robot check on reload because the rank view didn't include the job.
+    expect(baseline.rankCheck).toMatchObject({ id: rankCheckJobId, status: 'done', errorCode: null });
 
     const simulation = await client.request('POST', `/books/${bookId}/rank/simulate`, { days: 30 });
     expect(simulation.json()).toMatchObject({ observed: expect.any(Number) });
