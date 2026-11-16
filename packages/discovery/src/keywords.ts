@@ -129,12 +129,25 @@ export function topicWords(text: string): Set<string> {
 }
 
 /** Words that appear in any seed but say nothing about the niche. */
-const NICHE_STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'book', 'serie', 'novel', 'fiction']);
+const NICHE_STOP_WORDS = topicWords('the and for with book series novel fiction');
 
 /** Seed words beyond the genre ("cozy", "bakery"). Empty when the seeds only restate the genre. */
 export function nicheWords(seeds: string[], genre: string): Set<string> {
   const genreWords = topicWords(genre);
   return new Set([...topicWords(seeds.join(' '))].filter((word) => !genreWords.has(word) && !NICHE_STOP_WORDS.has(word)));
+}
+
+/** Listing words that say how the book is sold, never what it is about. */
+const LISTING_WORDS = topicWords('series set collection box kindle ebook paperback audiobook unlimited free new best read adult');
+
+/**
+ * Autocomplete pairs a niche with topics the book may not have ("cozy mystery horses").
+ * A phrase describes the book when each word beyond the book's own words and listing words appears in the manuscript.
+ */
+export function describesBook(phrase: string, ownWords: Set<string>, bookWords: Set<string>): boolean {
+  return [...topicWords(phrase)].every(
+    (word) => ownWords.has(word) || bookWords.has(word) || NICHE_STOP_WORDS.has(word) || LISTING_WORDS.has(word),
+  );
 }
 
 /** A phrase fits the niche when it shares a niche word. With no niche words every phrase fits. */

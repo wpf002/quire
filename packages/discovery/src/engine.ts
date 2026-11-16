@@ -1,5 +1,5 @@
 import { type CategoryFitResult, rankCategories } from './categories';
-import { type KeywordScore, combineScore, competitionScore, demandScore, expandSeeds, fitsNiche, median, namesASeries, namesAnAuthor, nicheWords, titleTags } from './keywords';
+import { type KeywordScore, combineScore, competitionScore, demandScore, describesBook, expandSeeds, fitsNiche, median, namesASeries, namesAnAuthor, nicheWords, titleTags, topicWords } from './keywords';
 import { type KeywordBox, packKeywordBoxes } from './metadata';
 import type { DiscoveryProviders, Storefront } from './providers';
 
@@ -19,6 +19,8 @@ export interface DiscoveryInput {
   storefront: Storefront;
   expectedDailySales: number;
   candidateLimit: number;
+  /** Manuscript text. Without it, phrases aren't checked against what the book covers. */
+  bookText?: string;
 }
 
 export interface DiscoveryResult {
@@ -32,7 +34,9 @@ export interface DiscoveryResult {
 export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryProviders): Promise<DiscoveryResult> {
   const niche = nicheWords(input.seeds, input.genre);
   const expanded = await expandSeeds(input.seeds, providers.suggestions, input.storefront, Math.max(input.candidateLimit, SUGGESTION_POOL_LIMIT), input.genre);
-  const pool = expanded.filter((phrase) => fitsNiche(phrase, niche));
+  const ownWords = topicWords([...input.seeds, input.genre, input.title, input.subtitle ?? ''].join(' '));
+  const bookWords = input.bookText === undefined ? null : topicWords(input.bookText);
+  const pool = expanded.filter((phrase) => fitsNiche(phrase, niche) && (bookWords === null || describesBook(phrase, ownWords, bookWords)));
   const candidates = pool.slice(0, input.candidateLimit);
   const keywords: KeywordScore[] = [];
   const compPrices: number[] = [];
@@ -60,8 +64,7 @@ export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryPr
     });
   }
   const tags = titleTags(titles);
-  const ownWords = [...input.seeds, input.genre];
-  const allowed = (phrase: string) => !namesAnAuthor(phrase, authors) && !namesASeries(phrase, tags, ownWords);
+  const allowed = (phrase: string) => !namesAnAuthor(phrase, authors) && !namesASeries(phrase, tags, [...input.seeds, input.genre]);
   const usable = keywords.filter((score) => allowed(score.keyword)).sort((left, right) => right.score - left.score);
   const fallback = pool.slice(input.candidateLimit).filter(allowed);
   const categoryQueries = [...new Set([...usable.slice(0, CATEGORY_KEYWORD_QUERIES).map((score) => score.keyword), input.genre.toLowerCase()])];

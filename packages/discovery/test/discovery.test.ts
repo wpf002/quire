@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   type KeywordSuggestionProvider,
+  type MarketDataProvider,
   SampleCategoryProvider,
   SampleMarketProvider,
   bsrForDailySales,
   categoryFit,
   demandScore,
+  describesBook,
   keywordBoxText,
   ebookRoyaltyCents,
   estimateDailySales,
@@ -224,6 +226,39 @@ describe('niche filter', () => {
     expect(fitsNiche('mystery comics', niche)).toBe(true);
   });
 
+  it('keeps phrases whose extra topics appear in the manuscript', () => {
+    const own = new Set(['cozy', 'bakery', 'mystery', 'proving', 'drawer']);
+    const book = new Set(['dough', 'oven', 'halloween', 'maggie']);
+    expect(describesBook('cozy mystery halloween', own, book)).toBe(true);
+    expect(describesBook('cozy bakery mystery series', own, book)).toBe(true);
+    expect(describesBook('cozy mysteries in egypt', own, book)).toBe(false);
+    expect(describesBook('quilting cozy mystery series', own, book)).toBe(false);  });
+
+  it('treats series as a stop word after plural stemming', () => {
+    expect([...nicheWords(['mystery series'], 'Mystery')]).toEqual([]);
+  });
+
+  it('scores and queries categories only with phrases the manuscript supports', async () => {
+    const suggestions: KeywordSuggestionProvider = {
+      name: 'topics',
+      async suggest(prefix) {
+        const all = ['cozy mystery horses', 'cozy mystery quilting', 'cozy mystery halloween', 'cozy bakery mystery books'];
+        return { prefix, suggestions: all.filter((value) => value.startsWith(prefix.trim())) };
+      },
+    };
+    const result = await runDiscovery(
+      {
+        title: 'The Proving Drawer', subtitle: 'A Cozy Bakery Mystery', genre: 'Mystery', seeds: ['cozy bakery mystery'],
+        storefront: 'kindle', expectedDailySales: 3, candidateLimit: 10, bookText: 'Maggie pulled the Halloween loaves from the oven.',
+      },
+      { suggestions, market: new SampleMarketProvider(), categories: new SampleCategoryProvider() },
+    );
+    const phrases = [...result.keywords.map((score) => score.keyword), ...result.boxes.flatMap((box) => box.phrases)];
+    expect(phrases).toContain('cozy mystery halloween');
+    expect(phrases).not.toContain('cozy mystery horses');
+    expect(phrases).not.toContain('cozy mystery quilting');
+  });
+
   it('drops off-niche suggestions before scoring', async () => {
     const mixed: KeywordSuggestionProvider = {
       name: 'mixed',
@@ -253,5 +288,28 @@ describe('runDiscovery', () => {
     expect(result.categories.length).toBeGreaterThan(0);
     expect(result.boxes[0]?.text.length).toBeGreaterThan(0);
     expect(result.sources).toContain('fixed');
+  });
+
+  it('keeps unscored fallback phrases that name a top-result author out of the boxes', async () => {
+    const suggestions: KeywordSuggestionProvider = {
+      name: 'pool',
+      async suggest(prefix) {
+        const all = ['cozy mystery cats', 'cozy mystery jen pitts', 'cozy mystery bakery'];
+        return { prefix, suggestions: all.filter((value) => value.startsWith(prefix.trim())) };
+      },
+    };
+    const market: MarketDataProvider = {
+      name: 'byline',
+      async market(keyword) {
+        return { keyword, resultCount: 2_000, topTitles: [{ title: 'Crumbs & Clues', authors: ['Jen Pitts'], bsr: null, reviews: 40, priceCents: 299 }] };
+      },
+    };
+    const result = await runDiscovery(
+      { title: 'Crumbs', subtitle: null, genre: 'Cozy Mystery', seeds: ['cozy mystery'], storefront: 'kindle', expectedDailySales: 3, candidateLimit: 1 },
+      { suggestions, market, categories: new SampleCategoryProvider() },
+    );
+    const boxed = result.boxes.flatMap((box) => box.phrases);
+    expect(boxed).not.toContain('cozy mystery jen pitts');
+    expect(boxed.some((phrase) => phrase !== result.keywords[0]?.keyword)).toBe(true);
   });
 });

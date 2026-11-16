@@ -50,6 +50,10 @@ export function countWords(text: string): number {
   return text.match(WORD_PATTERN)?.length ?? 0;
 }
 
+export function manuscriptText(manuscript: Manuscript): string {
+  return manuscript.chapters.flatMap((chapter) => [chapter.title, ...chapter.blocks.map(blockText)]).join('\n');
+}
+
 export function manuscriptWordCount(manuscript: Manuscript): number {
   let total = 0;
   for (const chapter of manuscript.chapters) {

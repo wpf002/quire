@@ -1,4 +1,4 @@
-import { estimatePrintPages, manuscriptWordCount, newId } from '@quire/core';
+import { estimatePrintPages, manuscriptText, manuscriptWordCount, newId } from '@quire/core';
 import {
   AmazonBlockedError,
   LAUNCH_RECOMMENDATION_KINDS,
@@ -41,7 +41,7 @@ export async function runDiscoveryJob(context: AppContext, payload: unknown): Pr
   const book = await context.prisma.book.findUniqueOrThrow({ where: { id: bookId } });
   const { manuscript } = await requireManuscript(context.prisma, bookId);
   const result = await runDiscovery(
-    { title: book.title, subtitle: book.subtitle, genre: book.genre, seeds: request.seeds, storefront: request.storefront, expectedDailySales: request.expectedDailySales, candidateLimit: CANDIDATE_LIMIT },
+    { title: book.title, subtitle: book.subtitle, genre: book.genre, seeds: request.seeds, storefront: request.storefront, expectedDailySales: request.expectedDailySales, candidateLimit: CANDIDATE_LIMIT, bookText: manuscriptText(manuscript) },
     context.discovery,
   ).catch((error: unknown) => {
     if (error instanceof AmazonBlockedError) throw deferForAmazonBlock(error.message);
