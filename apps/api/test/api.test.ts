@@ -162,6 +162,11 @@ describe('self-serve flow', () => {
     const patched = await client.request('PATCH', `/books/${bookId}/metadata/draft`, { description: 'A caravan crosses the salt flats.' });
     expect(patched.status).toBe(200);
 
+    // Regression: publishing used to skip the export, and with it the rights confirmation that export requires.
+    const unexported = await client.request('POST', `/books/${bookId}/metadata/publish`, { asin: 'B0TEST0001' });
+    expect(unexported.status).toBe(409);
+    expect(unexported.json().message).toBe('Export the current manuscript before publishing');
+
     const exported = await client.request('POST', `/books/${bookId}/exports`, { format: 'epub' });
     expect(exported.status).toBe(201);
     const exportId = (exported.json().export as { id: string }).id;

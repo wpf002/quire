@@ -85,6 +85,17 @@ async function syncTrackedKeywords(context: AppContext, bookId: string, userPlan
   await context.prisma.trackedKeyword.updateMany({ where: { bookId, keyword: { in: phrases } }, data: { active: true } });
 }
 
+/** An export needs every rights item confirmed, so an export of the current manuscript means the book is cleared to go live. */
+async function requireCurrentExport(prisma: PrismaClient, bookId: string) {
+  const [latestVersion, latestExport] = await Promise.all([
+    prisma.manuscriptVersion.findFirst({ where: { bookId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+    prisma.export.findFirst({ where: { bookId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+  ]);
+  if (!latestExport || (latestVersion && latestExport.createdAt < latestVersion.createdAt)) {
+    throw conflict('Export the current manuscript before publishing');
+  }
+}
+
 /** Make the draft the live listing. The first apply is the publish. */
 export async function applyDraft(context: AppContext, userId: string, bookId: string, asin: string | null): Promise<MetadataVersion> {
   const draft = await draftVersion(context.prisma, bookId);
@@ -97,6 +108,7 @@ export async function applyDraft(context: AppContext, userId: string, bookId: st
   if (firstPublish) {
     const velocity = await publishingVelocity(context, userId);
     if (velocity.remaining === 0) throw conflict(`KDP allows ${velocity.limit} new titles a day. Next slot ${velocity.nextSlotAt?.toISOString()}`);
+    await requireCurrentExport(context.prisma, bookId);
   }
   const now = context.clock();
   const applied = await context.prisma.$transaction(async (tx) => {
