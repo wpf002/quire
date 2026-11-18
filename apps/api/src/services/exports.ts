@@ -17,7 +17,9 @@ export async function createExport(context: AppContext, bookId: string, format: 
   if (open.length > 0) throw conflict(`Confirm ${open.length} rights ${open.length === 1 ? 'item' : 'items'} before exporting`);
 
   const book = await context.prisma.book.findUniqueOrThrow({ where: { id: bookId } });
-  const { manuscript } = await requireManuscript(context.prisma, bookId);
+  const { manuscript: uploaded } = await requireManuscript(context.prisma, bookId);
+  // Uploads carry a filename-based title and often no author. The book record holds what the author entered.
+  const manuscript = { ...uploaded, title: book.title, author: book.author };
   const now = context.clock();
   const options: ExportOptions = {
     target,

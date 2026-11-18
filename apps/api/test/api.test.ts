@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import JSZip from 'jszip';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import type { AppContext } from '../src/context';
@@ -196,6 +197,11 @@ describe('self-serve flow', () => {
     const download = await client.request('GET', `/books/${bookId}/exports/${exportId}/download`);
     expect(download.status).toBe(200);
     expect(download.raw.headers['content-disposition']).toBe('attachment; filename="the-salt-road-kdp.epub"');
+    // Regression: Markdown and DOCX uploads carry no author, which made the EPUB fail epubcheck.
+    const epub = await JSZip.loadAsync(download.raw.rawPayload);
+    const packageDocument = await epub.file('OEBPS/content.opf')!.async('string');
+    expect(packageDocument).toContain('<dc:creator>Test Author</dc:creator>');
+    expect(packageDocument).toContain('<dc:title>The Salt Road</dc:title>');
 
     const published = await client.request('POST', `/books/${bookId}/metadata/publish`, { asin: 'B0TEST0001' });
     expect(published.status).toBe(200);
