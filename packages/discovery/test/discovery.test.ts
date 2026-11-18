@@ -252,6 +252,9 @@ describe('niche filter', () => {
     expect(describesBook('mystery kitchen', own, passing)).toBe(false);
     expect(categoryMatchesBook('Books › Cozy Culinary Mysteries', own, passing)).toBe(false);
     expect(categoryMatchesBook('Books › Cozy Bookstores & Libraries Mysteries', own, passing)).toBe(false);
+    expect(categoryMatchesBook('Books › Mystery Anthologies', own, passing)).toBe(false);
+    expect(categoryMatchesBook('Books › Mystery Anthologies', new Set(['anthology']), passing)).toBe(true);
+    expect(categoryMatchesBook("Books › Children's Mystery, Detective, & Spy", own, passing)).toBe(false);
     expect(categoryMatchesBook('Books › Private Investigator Mysteries', own, passing)).toBe(true);
 
     const themed = bookTopics(`${scenes} ${'The kitchen was quiet. '.repeat(5)}`);
@@ -260,7 +263,7 @@ describe('niche filter', () => {
   });
 
   it('rejects suggestions for products other than a novel', () => {
-    for (const phrase of ['detective mystery word search', 'detective mystery box games', 'detective mystery kit', 'murder mystery audible', 'murder mystery for 9-12', 'murder mystery young adult', 'murder mysteries ya']) {
+    for (const phrase of ['british fiction 2026', 'ww2 british fiction', 'classic mystery box', 'detective mystery word search', 'detective mystery box games', 'detective mystery kit', 'murder mystery audible', 'murder mystery for 9-12', 'murder mystery young adult', 'murder mysteries ya']) {
       expect(isUsableKeyword(phrase)).toBe(false);
     }
     expect(isUsableKeyword('classic detective mystery')).toBe(true);

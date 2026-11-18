@@ -72,7 +72,7 @@ const SUFFIXES = [' ', ...'abcdefghijklmnopqrstuvwxyz'.split('').map((letter) =>
 /** Longer suggestions are almost always book titles, not search phrases. */
 const MAX_KEYWORD_WORDS = 6;
 /** Suggestions that describe a different product than one paid book. */
-const OFF_PRODUCT_PATTERN = /\b(free|dvd|box(ed)? sets?|bundles?|mega set|book \d+|\d+-book|paperbacks?|prime reading|(kindle )?unlimited|top \d+|word search(es)?|puzzles?|games?|kits?|coloring|audiobooks?|audible|young adult|ya|for (kids|teens)|\d+-\d+)\b/;
+const OFF_PRODUCT_PATTERN = /\b(free|dvd|box(es|ed)?( sets?)?|bundles?|mega set|book \d+|\d+-book|paperbacks?|prime reading|(kindle )?unlimited|top \d+|word search(es)?|puzzles?|games?|kits?|coloring|audiobooks?|audible|young adult|ya|for (kids|teens)|\d+-\d+|\d{4}|[a-z]+\d+)\b/;
 /** Autocomplete also returns store labels ("cozy mystery kindle+"). Search phrases hold only words. */
 const SEARCH_PHRASE_PATTERN = /^[\p{L}\p{N}\s'’&-]+$/u;
 

@@ -53,6 +53,14 @@ const LIST_SUBJECTS = [
     listWords: topicWords('bookstore bookstores library libraries'),
     evidence: topicWords('bookstore bookstores bookshop bookshops library libraries librarian'),
   },
+  {
+    listWords: topicWords('anthology anthologies'),
+    evidence: topicWords('anthology anthologies'),
+  },
+  {
+    listWords: topicWords('children kids teen teens juvenile'),
+    evidence: topicWords('children kids teen teens juvenile'),
+  },
 ];
 
 function hasSubject(evidence: Set<string>, ownWords: Set<string>, book: BookTopics): boolean {
