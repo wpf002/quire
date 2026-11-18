@@ -73,9 +73,11 @@ const SUFFIXES = [' ', ...'abcdefghijklmnopqrstuvwxyz'.split('').map((letter) =>
 const MAX_KEYWORD_WORDS = 6;
 /** Suggestions that describe a different product than one paid book. */
 const OFF_PRODUCT_PATTERN = /\b(free|dvd|box(ed)? sets?|bundles?|mega set|book \d+|\d+-book|paperbacks?|prime reading|(kindle )?unlimited|top \d+)\b/;
+/** Autocomplete also returns store labels ("cozy mystery kindle+"). Search phrases hold only words. */
+const SEARCH_PHRASE_PATTERN = /^[\p{L}\p{N}\s'’&-]+$/u;
 
 export function isUsableKeyword(phrase: string): boolean {
-  return phrase.split(/\s+/).length <= MAX_KEYWORD_WORDS && !OFF_PRODUCT_PATTERN.test(phrase);
+  return phrase.split(/\s+/).length <= MAX_KEYWORD_WORDS && SEARCH_PHRASE_PATTERN.test(phrase) && !OFF_PRODUCT_PATTERN.test(phrase);
 }
 
 function normalizeName(text: string): string {

@@ -155,6 +155,12 @@ describe('keywords', () => {
   });
 
   // Regression: a live run kept "cozy mysteries michael connelly" and packed the name into a box.
+  it('rejects autocomplete store labels but keeps punctuated search phrases', () => {
+    expect(isUsableKeyword('cozy mystery kindle+')).toBe(false);
+    expect(isUsableKeyword("baker's cozy mystery")).toBe(true);
+    expect(isUsableKeyword('crafts & hobbies mystery')).toBe(true);
+  });
+
   it('flags keywords that name an author from the top results', () => {
     const authors = ['Michael Connelly', 'K.M. Morgan', 'Cher'];
     expect(namesAnAuthor('cozy mysteries michael connelly', authors)).toBe(true);
