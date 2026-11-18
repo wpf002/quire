@@ -31,7 +31,9 @@ export async function runPass(
         notes = await modelStructuralNotes(manuscript, gateway, { model });
       } else {
         model = models.cheap;
-        modelEdits = await modelLineEdits(manuscript, gateway, { model, kind });
+        const lineEdits = await modelLineEdits(manuscript, gateway, { model, kind });
+        modelEdits = lineEdits.edits;
+        modelSkippedReason = lineEdits.stoppedReason;
       }
     } catch (error) {
       if (!(error instanceof SpendCapError)) throw error;

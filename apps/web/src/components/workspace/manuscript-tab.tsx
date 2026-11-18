@@ -203,6 +203,7 @@ function StatusTag({ pass }: { pass: Pass }) {
   if (pass.status === 'failed') return <span className="tag tag-accent" title={pass.error ?? undefined}>Failed</span>;
   if (pass.status !== 'done') return <span className="tag tag-gilt"><span className="spinner" /> {pass.status === 'queued' ? 'Queued' : 'Running'}</span>;
   if (!pass.model) return <span className="tag" title={pass.modelSkippedReason ?? undefined}>Rules Only</span>;
+  if (pass.modelSkippedReason) return <span className="tag tag-gilt" title={pass.modelSkippedReason}>Partial</span>;
   return <span className="tag tag-blue">Model</span>;
 }
 

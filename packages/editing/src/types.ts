@@ -39,6 +39,6 @@ export interface PassResult {
   edits: EditProposal[];
   notes: StructuralNote[];
   touch: ContentTouch;
-  /** Set when the model path was skipped and only rules ran. */
+  /** Set when the model never ran, or when `model` is also set, when a spend cap stopped it partway through the book. */
   modelSkippedReason: string | null;
 }

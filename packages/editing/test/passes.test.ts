@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Manuscript, ModelGateway } from '@quire/core';
+import { type Manuscript, type ModelGateway, SpendCapError, cents } from '@quire/core';
+import { PARAGRAPHS_PER_CALL } from '../src/model';
 import { blockTexts, classifyModelEdit, dropDuplicateEdits, manuscriptForReview, runPass, unavailableForTest } from './helpers';
 
 const manuscript: Manuscript = {
@@ -95,6 +96,48 @@ describe('runPass model', () => {
     expect(modelEdits).toHaveLength(1);
     expect(modelEdits[0]?.aiRole).toBe('assisted');
     expect(result.touch.aiRole).toBe('assisted');
+  });
+
+  const capError = new SpendCapError({ allowed: false, reason: 'account-cap', capCents: cents(100), spentCents: cents(100) });
+  const longManuscript: Manuscript = {
+    title: 'T',
+    author: 'A',
+    chapters: [{
+      id: 'c1',
+      title: 'One',
+      blocks: Array.from({ length: PARAGRAPHS_PER_CALL + 1 }, (_, index) => ({ kind: 'paragraph' as const, id: `p${index}`, runs: [{ text: `Paragrap number ${index}` }] })),
+    }],
+  };
+
+  // Regression: the cap stopped Proofread on a full novel after 9 paid calls, and every edit from those calls was thrown away.
+  it('keeps paid edits when the spend cap stops a pass partway', async () => {
+    let calls = 0;
+    const gateway: ModelGateway = {
+      available: true,
+      async complete() {
+        calls += 1;
+        if (calls > 1) throw capError;
+        return { model: 'claude-haiku-5-5', tokens: { input: 10, output: 10 }, text: JSON.stringify([{ id: 'p0', before: 'Paragrap', after: 'Paragraph', reason: 'Spelling' }]) };
+      },
+    };
+    const result = await runPass('proofread', longManuscript, gateway, models);
+    expect(result.edits.filter((edit) => edit.source === 'model').map((edit) => edit.blockId)).toEqual(['p0']);
+    expect(result.model).toBe('claude-haiku-5-5');
+    expect(result.touch.aiRole).toBe('assisted');
+    expect(result.modelSkippedReason).toBe('Account spend cap reached');
+  });
+
+  it('reports rules only when the spend cap refuses the first call', async () => {
+    const gateway: ModelGateway = {
+      available: true,
+      async complete() {
+        throw capError;
+      },
+    };
+    const result = await runPass('proofread', longManuscript, gateway, models);
+    expect(result.model).toBeNull();
+    expect(result.touch.aiRole).toBe('none');
+    expect(result.modelSkippedReason).toBe('Account spend cap reached');
   });
 
   it('labels structural notes generic unless the quote is verified', async () => {

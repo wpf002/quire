@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type Manuscript, type ModelGateway, blockText, isTextBlock } from '@quire/core';
+import { type Manuscript, type ModelGateway, SpendCapError, blockText, isTextBlock } from '@quire/core';
 import { classifyModelEdit } from './classify';
 import type { EditProposal, StructuralNote } from './types';
 
@@ -31,11 +31,17 @@ export function extractJson(text: string): unknown {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+export interface ModelLineEdits {
+  edits: EditProposal[];
+  /** Set when a spend cap ended the pass after some paragraphs were already reviewed and paid for. */
+  stoppedReason: string | null;
+}
+
 export async function modelLineEdits(
   manuscript: Manuscript,
   gateway: ModelGateway,
   options: { model: string; kind: 'copyedit' | 'proofread' },
-): Promise<EditProposal[]> {
+): Promise<ModelLineEdits> {
   const paragraphs = manuscript.chapters.flatMap((chapter) =>
     chapter.blocks.filter(isTextBlock).map((block) => ({ chapterId: chapter.id, id: block.id, text: blockText(block) })),
   );
@@ -43,13 +49,19 @@ export async function modelLineEdits(
   const edits: EditProposal[] = [];
   for (let offset = 0; offset < paragraphs.length; offset += PARAGRAPHS_PER_CALL) {
     const batch = paragraphs.slice(offset, offset + PARAGRAPHS_PER_CALL);
-    const completion = await gateway.complete({
-      model: options.model,
-      system: options.kind === 'copyedit' ? COPYEDIT_SYSTEM : PROOFREAD_SYSTEM,
-      prompt: JSON.stringify(batch.map(({ id, text }) => ({ id, text }))),
-      maxTokens: EDIT_MAX_TOKENS,
-      cacheSystem: true,
-    });
+    let completion: Awaited<ReturnType<ModelGateway['complete']>>;
+    try {
+      completion = await gateway.complete({
+        model: options.model,
+        system: options.kind === 'copyedit' ? COPYEDIT_SYSTEM : PROOFREAD_SYSTEM,
+        prompt: JSON.stringify(batch.map(({ id, text }) => ({ id, text }))),
+        maxTokens: EDIT_MAX_TOKENS,
+        cacheSystem: true,
+      });
+    } catch (error) {
+      if (offset === 0 || !(error instanceof SpendCapError)) throw error;
+      return { edits, stoppedReason: error.message };
+    }
     const parsed = EditListSchema.safeParse(extractJson(completion.text));
     if (!parsed.success) throw new Error(`Model returned malformed edits: ${parsed.error.message}`);
     for (const edit of parsed.data) {
@@ -62,7 +74,7 @@ export async function modelLineEdits(
       });
     }
   }
-  return edits;
+  return { edits, stoppedReason: null };
 }
 
 // Titles imported from "# Chapter 3: The Key" already carry the number.
