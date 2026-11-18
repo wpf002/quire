@@ -34,8 +34,12 @@ export async function saveManuscript(prisma: PrismaClient, bookId: string, manus
   return version;
 }
 
-/** A new upload gets new block ids, so edits still pending against the old file can never apply. */
+/**
+ * A new upload gets new block ids, so edits still pending against the old file can never apply.
+ * Compliance reports go too: the author's rights confirmations covered the old file's text.
+ */
 export async function saveUploadedManuscript(prisma: PrismaClient, bookId: string, manuscript: Manuscript, format: string): Promise<number> {
+  await prisma.complianceReport.deleteMany({ where: { bookId } });
   const version = await saveManuscript(prisma, bookId, manuscript, `upload:${format}`);
   await prisma.edit.deleteMany({ where: { bookId, status: 'pending' } });
   return version;

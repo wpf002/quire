@@ -16,10 +16,17 @@ const EXCERPT_CHARS = 90;
 // Lines that read like lyrics or poetry quoted from someone else: short lines inside quote blocks.
 const LYRIC_HINT = /\b(chorus|verse|lyrics|sang|singing)\b/i;
 const QUOTED_SPAN = /[“"]([^”"]{40,})[”"]/g;
+// Quotation marks in fiction are mostly dialogue. Narration around a borrowed passage names where it came from.
+const SOURCE_CUE = /\b(wrote|writes|written by|according to|excerpt|quoted|quoting|quotes|lyrics?|song|poem|verse|chorus|sang|sings)\b/i;
 const TRADEMARKS = ['Coca-Cola', 'Kleenex', 'Xerox', 'Google', 'iPhone', 'Disney', 'Harry Potter', 'Star Wars', 'Marvel', 'Barbie', 'Lego'];
 
 function excerpt(text: string): string {
   return text.length > EXCERPT_CHARS ? `${text.slice(0, EXCERPT_CHARS)}…` : text;
+}
+
+function quotesLongSource(text: string): boolean {
+  const hasLongSpan = [...text.matchAll(QUOTED_SPAN)].some((match) => (match[1] ?? '').split(/\s+/).length >= LONG_QUOTE_WORDS);
+  return hasLongSpan && SOURCE_CUE.test(text.replace(QUOTED_SPAN, ' '));
 }
 
 /** Pre-export rights checklist. Automated checks flag spots to review; Quire can't decide rights questions for the author. */
@@ -28,7 +35,7 @@ export function rightsChecklist(manuscript: Manuscript): ChecklistItem[] {
 
   const longQuotes = blocks.filter(({ block, text }) => {
     if (block.kind === 'quote') return text.split(/\s+/).length >= LONG_QUOTE_WORDS || LYRIC_HINT.test(text);
-    return [...text.matchAll(QUOTED_SPAN)].some((match) => (match[1] ?? '').split(/\s+/).length >= LONG_QUOTE_WORDS);
+    return quotesLongSource(text);
   });
 
   const seen = new Map<string, string>();

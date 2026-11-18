@@ -62,6 +62,23 @@ describe('rightsChecklist', () => {
     expect(items.find((item) => item.id === 'duplicates')?.findings[0]?.blockId).toBe('p2');
     expect(items.find((item) => item.id === 'quotations')?.status).toBe('review');
   });
+
+  const longSpeech = Array.from({ length: 60 }, (_, index) => `word${index}`).join(' ');
+  const quotationsFor = (text: string) =>
+    rightsChecklist({
+      title: 'T',
+      author: 'A',
+      chapters: [{ id: 'c1', title: 'One', blocks: [{ kind: 'paragraph', id: 'p1', runs: [{ text }] }] }],
+    }).find((item) => item.id === 'quotations');
+
+  // Regression: a 56,000-word novel had 103 passages of its own dialogue flagged as quotations.
+  it('leaves long dialogue alone', () => {
+    expect(quotationsFor(`“${longSpeech},” said Poirot, and he smiled.`)?.status).toBe('pass');
+  });
+
+  it('flags a long inline quotation credited to a source', () => {
+    expect(quotationsFor(`As the poet wrote in her most famous poem, “${longSpeech}.”`)?.status).toBe('review');
+  });
 });
 
 describe('velocityStatus', () => {

@@ -113,6 +113,28 @@ describe('spend caps', () => {
     expect(after).toHaveLength(0);
   });
 
+  // Regression: rights confirmed for one file still allowed export after a different file replaced it.
+  it('requires a new compliance check and confirmations when a new file replaces the manuscript', async () => {
+    const client = new TestClient(app);
+    await client.signup('reconfirm@example.test');
+    const bookId = await newBook(client);
+    expect((await client.upload(`/books/${bookId}/upload`, 'salt-road.md', SAMPLE_MANUSCRIPT)).status).toBe(201);
+    expect((await client.request('POST', `/books/${bookId}/compliance`)).status).toBe(201);
+    const { report } = (await client.request('GET', `/books/${bookId}/compliance`)).json() as { report: { checklist: Array<{ id: string; status: string }> } };
+    const itemIds = report.checklist.filter((item) => item.status === 'confirm').map((item) => item.id);
+    expect((await client.request('POST', `/books/${bookId}/compliance/confirm`, { itemIds, confirmed: true })).status).toBe(200);
+
+    expect((await client.upload(`/books/${bookId}/upload`, 'other-book.md', SAMPLE_MANUSCRIPT)).status).toBe(201);
+
+    expect((await client.request('GET', `/books/${bookId}/compliance`)).json().report).toBeNull();
+    const blocked = await client.request('POST', `/books/${bookId}/exports`, { format: 'epub', target: 'kdp', trim: '6x9' });
+    expect(blocked.status).toBe(409);
+
+    expect((await client.request('POST', `/books/${bookId}/compliance`)).status).toBe(201);
+    const rerun = (await client.request('GET', `/books/${bookId}/compliance`)).json() as { report: { confirmations: string[] } };
+    expect(rerun.report.confirmations).toEqual([]);
+  });
+
   // Regression: rejecting one mark of a quote pair while accepting the other left mismatched quotes.
   it('decides both marks of a quote pair together', async () => {
     const client = new TestClient(app);
