@@ -1,3 +1,4 @@
+import { topicWords } from './keywords';
 import type { CategoryThresholds } from './providers';
 import { estimateDailySales } from './sales';
 
@@ -24,6 +25,38 @@ export function categoryFit(category: CategoryThresholds, expectedDailySales: nu
   else if (salesForTopTen <= expectedDailySales * STRETCH_MULTIPLIER) fit = 'stretch';
   else fit = 'crowded';
   return { ...category, fit, salesForTopTen, salesForFirst };
+}
+
+/** A manuscript rarely says "culinary" or "animal", so each list subject names the words that show a book has it. */
+const LIST_SUBJECTS = [
+  {
+    listWords: topicWords('culinary food foods cooking'),
+    evidence: topicWords('culinary food cook cooks cooked cooking chef recipe bakery baker bake baked baking dough bread loaf loaves pastry cake cafe restaurant kitchen'),
+  },
+  {
+    listWords: topicWords('animal animals pet pets cat cats dog dogs'),
+    evidence: topicWords('animal pet cat kitten dog puppy horse veterinarian'),
+  },
+  {
+    listWords: topicWords('witch witches wizard wizards warlock paranormal supernatural magic magical'),
+    evidence: topicWords('witch witches wizard warlock coven spell spells magic magical paranormal supernatural ghost ghosts vampire'),
+  },
+  {
+    listWords: topicWords('craft crafts hobby hobbies'),
+    evidence: topicWords('craft crafts hobby quilt quilting knit knitting sew sewing crochet scrapbook pottery yarn'),
+  },
+  {
+    listWords: topicWords('holiday holidays christmas'),
+    evidence: topicWords('holiday holidays christmas halloween thanksgiving easter hanukkah'),
+  },
+];
+
+/** A list named for a subject fits only a book with that subject. Lists that name none, like "Mystery", always fit. */
+export function categoryMatchesBook(path: string, bookWords: Set<string>): boolean {
+  const listName = topicWords(path.split('›').at(-1) ?? path);
+  return LIST_SUBJECTS.every(
+    ({ listWords, evidence }) => ![...listName].some((word) => listWords.has(word)) || [...evidence].some((word) => bookWords.has(word)),
+  );
 }
 
 const FIT_ORDER: Record<CategoryFit, number> = { winnable: 0, stretch: 1, crowded: 2, ghost: 3 };

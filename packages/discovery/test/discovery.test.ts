@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type CategoryProvider,
   type KeywordSuggestionProvider,
   type MarketDataProvider,
   SampleCategoryProvider,
   SampleMarketProvider,
+  SampleSuggestionProvider,
   bsrForDailySales,
   categoryFit,
   demandScore,
@@ -263,6 +265,29 @@ describe('niche filter', () => {
     expect(phrases).toContain('cozy mystery halloween');
     expect(phrases).not.toContain('cozy mystery horses');
     expect(phrases).not.toContain('cozy mystery quilting');
+  });
+
+  it('drops category lists for subjects the book does not have', async () => {
+    const paths = [
+      'Kindle Store › Kindle eBooks › Mystery',
+      'Books › Witch & Wizard Mysteries',
+      'Books › Cozy Culinary Mysteries',
+      'Kindle Store › Kindle eBooks › Cozy Animal Mystery',
+    ];
+    const categories: CategoryProvider = {
+      name: 'fixed',
+      async categories() {
+        return paths.map((path) => ({ path, bsrFirst: 100, bsrTenth: 1_000 }));
+      },
+    };
+    const input = { title: 'The Proving Drawer', subtitle: null, genre: 'Mystery', seeds: ['cozy mystery'], storefront: 'kindle' as const, expectedDailySales: 3, candidateLimit: 1 };
+    const providers = { suggestions: new SampleSuggestionProvider(), market: new SampleMarketProvider(), categories };
+
+    const checked = await runDiscovery({ ...input, bookText: 'Maggie looked up from the dough. She had baked twelve loaves.' }, providers);
+    expect(checked.categories.map((category) => category.path).sort()).toEqual(['Books › Cozy Culinary Mysteries', 'Kindle Store › Kindle eBooks › Mystery']);
+
+    const unchecked = await runDiscovery(input, providers);
+    expect(unchecked.categories).toHaveLength(paths.length);
   });
 
   it('drops off-niche suggestions before scoring', async () => {

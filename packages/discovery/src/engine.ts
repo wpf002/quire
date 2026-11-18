@@ -1,4 +1,4 @@
-import { type CategoryFitResult, rankCategories } from './categories';
+import { type CategoryFitResult, categoryMatchesBook, rankCategories } from './categories';
 import { type KeywordScore, combineScore, competitionScore, demandScore, describesBook, expandSeeds, fitsNiche, median, namesASeries, namesAnAuthor, nicheWords, titleTags, topicWords } from './keywords';
 import { type KeywordBox, packKeywordBoxes } from './metadata';
 import type { DiscoveryProviders, Storefront } from './providers';
@@ -68,7 +68,10 @@ export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryPr
   const usable = keywords.filter((score) => allowed(score.keyword)).sort((left, right) => right.score - left.score);
   const fallback = pool.slice(input.candidateLimit).filter(allowed);
   const categoryQueries = [...new Set([...usable.slice(0, CATEGORY_KEYWORD_QUERIES).map((score) => score.keyword), input.genre.toLowerCase()])];
-  const categories = rankCategories(await providers.categories.categories(categoryQueries, input.storefront), input.expectedDailySales);
+  const foundCategories = await providers.categories.categories(categoryQueries, input.storefront);
+  const knownWords = new Set([...ownWords, ...(bookWords ?? [])]);
+  const matchingCategories = bookWords === null ? foundCategories : foundCategories.filter((category) => categoryMatchesBook(category.path, knownWords));
+  const categories = rankCategories(matchingCategories, input.expectedDailySales);
   return {
     keywords: usable,
     boxes: packKeywordBoxes(usable, input.title, input.subtitle, fallback),
