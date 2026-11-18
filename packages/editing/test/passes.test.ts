@@ -140,6 +140,36 @@ describe('runPass model', () => {
     expect(result.modelSkippedReason).toBe('Account spend cap reached');
   });
 
+  // Regression: one unreadable reply failed the job, and the retry paid for every finished batch again.
+  it('repeats only the batch whose reply was unreadable', async () => {
+    const prompts: string[] = [];
+    const gateway: ModelGateway = {
+      available: true,
+      async complete(request) {
+        prompts.push(request.prompt);
+        const text = prompts.length === 2 ? 'Sorry, no list here.' : JSON.stringify([{ id: prompts.length === 1 ? 'p0' : `p${PARAGRAPHS_PER_CALL}`, before: 'Paragrap', after: 'Paragraph', reason: 'Spelling' }]);
+        return { model: 'claude-haiku-5-5', tokens: { input: 10, output: 10 }, text };
+      },
+    };
+    const result = await runPass('proofread', longManuscript, gateway, models);
+    expect(prompts).toHaveLength(3);
+    expect(prompts[2]).toBe(prompts[1]);
+    expect(result.edits.filter((edit) => edit.source === 'model').map((edit) => edit.blockId)).toEqual(['p0', `p${PARAGRAPHS_PER_CALL}`]);
+  });
+
+  it('fails the pass when a batch stays unreadable', async () => {
+    let calls = 0;
+    const gateway: ModelGateway = {
+      available: true,
+      async complete() {
+        calls += 1;
+        return { model: 'claude-haiku-5-5', tokens: { input: 10, output: 10 }, text: 'Sorry, no list here.' };
+      },
+    };
+    await expect(runPass('proofread', longManuscript, gateway, models)).rejects.toThrow('Model reply had no JSON array');
+    expect(calls).toBe(2);
+  });
+
   it('labels structural notes generic unless the quote is verified', async () => {
     const gateway: ModelGateway = {
       available: true,

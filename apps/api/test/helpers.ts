@@ -17,9 +17,10 @@ export const TEST_DATABASE_URL = process.env.QUIRE_TEST_DATABASE_URL ?? 'postgre
 export class RecordingGateway implements ModelGateway {
   readonly available = true;
   calls: CompletionRequest[] = [];
+  queuedReplies: string[] = [];
   async complete(request: CompletionRequest): Promise<Completion> {
     this.calls.push(request);
-    return { text: '[]', model: request.model, tokens: { input: 10, output: 2 } };
+    return { text: this.queuedReplies.shift() ?? '[]', model: request.model, tokens: { input: 10, output: 2 } };
   }
 }
 

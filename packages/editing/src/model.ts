@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type Manuscript, type ModelGateway, SpendCapError, blockText, isTextBlock } from '@quire/core';
+import { type CompletionRequest, type Manuscript, type ModelGateway, SpendCapError, blockText, isTextBlock } from '@quire/core';
 import { classifyModelEdit } from './classify';
 import type { EditProposal, StructuralNote } from './types';
 
@@ -9,7 +9,10 @@ export const STRUCTURAL_MAX_TOKENS = 6_000;
 /** ~150k tokens of manuscript; longer books are sampled by chapter. */
 export const STRUCTURAL_MAX_CHARS = 600_000;
 
+const MALFORMED_REPLY_ATTEMPTS = 2;
+
 const EditListSchema = z.array(z.object({ id: z.string(), before: z.string().min(1), after: z.string(), reason: z.string() }));
+type ModelEdit = z.infer<typeof EditListSchema>[number];
 const NoteListSchema = z.array(z.object({ chapter: z.number().int().nullable(), note: z.string().min(1), quote: z.string().nullable() }));
 
 const COPYEDIT_SYSTEM = `You are a line copyeditor for fiction and nonfiction. Fix grammar, punctuation, usage, consistency, and clarity errors.
@@ -31,6 +34,26 @@ export function extractJson(text: string): unknown {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+function parseBatchEdits(text: string): ModelEdit[] {
+  const parsed = EditListSchema.safeParse(extractJson(text));
+  if (!parsed.success) throw new Error(`Model returned malformed edits: ${parsed.error.message}`);
+  return parsed.data;
+}
+
+/** Repeats only the batch with the bad reply, because failing the job would pay for every finished batch again. */
+async function requestBatchEdits(gateway: ModelGateway, request: CompletionRequest): Promise<ModelEdit[]> {
+  let parseError: unknown;
+  for (let attempt = 0; attempt < MALFORMED_REPLY_ATTEMPTS; attempt += 1) {
+    const completion = await gateway.complete(request);
+    try {
+      return parseBatchEdits(completion.text);
+    } catch (error) {
+      parseError = error;
+    }
+  }
+  throw parseError;
+}
+
 export interface ModelLineEdits {
   edits: EditProposal[];
   /** Set when a spend cap ended the pass after some paragraphs were already reviewed and paid for. */
@@ -49,22 +72,21 @@ export async function modelLineEdits(
   const edits: EditProposal[] = [];
   for (let offset = 0; offset < paragraphs.length; offset += PARAGRAPHS_PER_CALL) {
     const batch = paragraphs.slice(offset, offset + PARAGRAPHS_PER_CALL);
-    let completion: Awaited<ReturnType<ModelGateway['complete']>>;
+    const request = {
+      model: options.model,
+      system: options.kind === 'copyedit' ? COPYEDIT_SYSTEM : PROOFREAD_SYSTEM,
+      prompt: JSON.stringify(batch.map(({ id, text }) => ({ id, text }))),
+      maxTokens: EDIT_MAX_TOKENS,
+      cacheSystem: true,
+    };
+    let batchEdits: ModelEdit[];
     try {
-      completion = await gateway.complete({
-        model: options.model,
-        system: options.kind === 'copyedit' ? COPYEDIT_SYSTEM : PROOFREAD_SYSTEM,
-        prompt: JSON.stringify(batch.map(({ id, text }) => ({ id, text }))),
-        maxTokens: EDIT_MAX_TOKENS,
-        cacheSystem: true,
-      });
+      batchEdits = await requestBatchEdits(gateway, request);
     } catch (error) {
       if (offset === 0 || !(error instanceof SpendCapError)) throw error;
       return { edits, stoppedReason: error.message };
     }
-    const parsed = EditListSchema.safeParse(extractJson(completion.text));
-    if (!parsed.success) throw new Error(`Model returned malformed edits: ${parsed.error.message}`);
-    for (const edit of parsed.data) {
+    for (const edit of batchEdits) {
       const paragraph = byId.get(edit.id);
       // Drop anything that doesn't match the manuscript verbatim. The model doesn't get to invent text to replace.
       if (!paragraph || !paragraph.text.includes(edit.before) || edit.before === edit.after) continue;

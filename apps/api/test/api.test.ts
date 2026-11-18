@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import JSZip from 'jszip';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFinished } from 'vitest';
 import { buildApp } from '../src/app';
 import type { AppContext } from '../src/context';
 import { Worker } from '../src/queue';
@@ -95,6 +95,28 @@ describe('spend caps', () => {
     const edits = (await client.request('GET', `/books/${bookId}/edits?status=pending`)).json().edits as unknown[];
     expect(edits.length).toBeGreaterThan(0);
     expect(await context.prisma.spendEntry.count()).toBe(0);
+  });
+
+  // Regression: Structural spent 64 cents across a failed attempt and its retry, and the pass reported 11.
+  it('reports the spend of every attempt on the pass', async () => {
+    // A separate app keeps this signup out of the shared app's per-minute auth limit.
+    const isolatedApp = await buildApp(context, { logger: false });
+    onTestFinished(() => isolatedApp.close());
+    const client = new TestClient(isolatedApp);
+    await client.signup('retry-cost@example.test');
+    const bookId = await newBook(client);
+    expect((await client.upload(`/books/${bookId}/upload`, 'salt-road.md', SAMPLE_MANUSCRIPT)).status).toBe(201);
+    const queued = await client.request('POST', `/books/${bookId}/passes`, { kind: 'structural' });
+    const passId = (queued.json().pass as { id: string }).id;
+
+    gateway.queuedReplies = ['Sorry, no list here.'];
+    await expect(runPassJob(context, { passId }, false)).rejects.toThrow('Model reply had no JSON array');
+    await runPassJob(context, { passId }, true);
+
+    const spend = await context.prisma.spendEntry.aggregate({ where: { bookId }, _sum: { costCents: true }, _count: true });
+    const pass = await context.prisma.pass.findUniqueOrThrow({ where: { id: passId } });
+    expect(spend._count).toBe(2);
+    expect(pass.costCents).toBe(spend._sum.costCents);
   });
 
   it('drops pending edits when a new file replaces the manuscript', async () => {

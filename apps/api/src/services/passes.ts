@@ -21,9 +21,9 @@ export async function runPassJob(context: AppContext, payload: unknown, final: b
   const { passId } = PassJobSchema.parse(payload);
   const pass = await context.prisma.pass.findUniqueOrThrow({ where: { id: passId }, include: { book: { select: { userId: true } } } });
   await context.prisma.pass.update({ where: { id: passId }, data: { status: 'running' } });
+  const ledger = new CountingLedger(context.ledger);
   try {
     const { manuscript } = await requireManuscript(context.prisma, pass.bookId, pass.manuscriptVersion);
-    const ledger = new CountingLedger(context.ledger);
     const gateway = meteredGateway(context.gateway, ledger, { accountId: pass.book.userId, bookId: pass.bookId, purpose: `pass:${pass.kind}` });
     const result = await runPass(pass.kind, manuscript, gateway, { cheap: context.env.QUIRE_MODEL_CHEAP, structural: context.env.QUIRE_MODEL_STRUCTURAL });
     // Copyedit and proofread overlap, and a rule and the model can flag the same typo. The author reviews each fix once.
@@ -56,7 +56,7 @@ export async function runPassJob(context: AppContext, payload: unknown, final: b
           modelSkippedReason: result.modelSkippedReason,
           touch: toJson(result.touch),
           notes: toJson(result.notes),
-          costCents: ledger.totalCents,
+          costCents: { increment: ledger.totalCents },
           finishedAt: context.clock(),
           error: null,
         },
@@ -65,7 +65,8 @@ export async function runPassJob(context: AppContext, payload: unknown, final: b
     await advanceStage(context.prisma, pass.bookId, 'edit');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await context.prisma.pass.update({ where: { id: passId }, data: final ? { status: 'failed', error: message, finishedAt: context.clock() } : { status: 'queued', error: message } });
+    const costCents = { increment: ledger.totalCents };
+    await context.prisma.pass.update({ where: { id: passId }, data: final ? { status: 'failed', error: message, costCents, finishedAt: context.clock() } : { status: 'queued', error: message, costCents } });
     throw error;
   }
 }
