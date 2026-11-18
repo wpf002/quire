@@ -1,4 +1,4 @@
-import { topicWords } from './keywords';
+import { type BookTopics, topicWords } from './keywords';
 import type { CategoryThresholds } from './providers';
 import { estimateDailySales } from './sales';
 
@@ -49,13 +49,22 @@ const LIST_SUBJECTS = [
     listWords: topicWords('holiday holidays christmas'),
     evidence: topicWords('holiday holidays christmas halloween thanksgiving easter hanukkah'),
   },
+  {
+    listWords: topicWords('bookstore bookstores library libraries'),
+    evidence: topicWords('bookstore bookstores bookshop bookshops library libraries librarian'),
+  },
 ];
 
+function hasSubject(evidence: Set<string>, ownWords: Set<string>, book: BookTopics): boolean {
+  const mentions = [...evidence].reduce((total, word) => total + (book.mentions.get(word) ?? 0), 0);
+  return mentions >= book.minMentions || [...evidence].some((word) => ownWords.has(word));
+}
+
 /** A list named for a subject fits only a book with that subject. Lists that name none, like "Mystery", always fit. */
-export function categoryMatchesBook(path: string, bookWords: Set<string>): boolean {
+export function categoryMatchesBook(path: string, ownWords: Set<string>, book: BookTopics): boolean {
   const listName = topicWords(path.split('›').at(-1) ?? path);
   return LIST_SUBJECTS.every(
-    ({ listWords, evidence }) => ![...listName].some((word) => listWords.has(word)) || [...evidence].some((word) => bookWords.has(word)),
+    ({ listWords, evidence }) => ![...listName].some((word) => listWords.has(word)) || hasSubject(evidence, ownWords, book),
   );
 }
 

@@ -1,5 +1,5 @@
 import { type CategoryFitResult, categoryMatchesBook, rankCategories } from './categories';
-import { type KeywordScore, combineScore, competitionScore, demandScore, describesBook, expandSeeds, fitsNiche, median, namesASeries, namesAnAuthor, nicheWords, titleTags, topicWords } from './keywords';
+import { type KeywordScore, bookTopics, combineScore, competitionScore, demandScore, describesBook, expandSeeds, fitsNiche, median, namesASeries, namesAnAuthor, nicheWords, titleTags, topicWords } from './keywords';
 import { type KeywordBox, packKeywordBoxes } from './metadata';
 import type { DiscoveryProviders, Storefront } from './providers';
 
@@ -35,8 +35,8 @@ export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryPr
   const niche = nicheWords(input.seeds, input.genre);
   const expanded = await expandSeeds(input.seeds, providers.suggestions, input.storefront, Math.max(input.candidateLimit, SUGGESTION_POOL_LIMIT), input.genre);
   const ownWords = topicWords([...input.seeds, input.genre, input.title, input.subtitle ?? ''].join(' '));
-  const bookWords = input.bookText === undefined ? null : topicWords(input.bookText);
-  const pool = expanded.filter((phrase) => fitsNiche(phrase, niche) && (bookWords === null || describesBook(phrase, ownWords, bookWords)));
+  const book = input.bookText === undefined ? null : bookTopics(input.bookText);
+  const pool = expanded.filter((phrase) => fitsNiche(phrase, niche) && (book === null || describesBook(phrase, ownWords, book)));
   const candidates = pool.slice(0, input.candidateLimit);
   const keywords: KeywordScore[] = [];
   const compPrices: number[] = [];
@@ -69,8 +69,7 @@ export async function runDiscovery(input: DiscoveryInput, providers: DiscoveryPr
   const fallback = pool.slice(input.candidateLimit).filter(allowed);
   const categoryQueries = [...new Set([...usable.slice(0, CATEGORY_KEYWORD_QUERIES).map((score) => score.keyword), input.genre.toLowerCase()])];
   const foundCategories = await providers.categories.categories(categoryQueries, input.storefront);
-  const knownWords = new Set([...ownWords, ...(bookWords ?? [])]);
-  const matchingCategories = bookWords === null ? foundCategories : foundCategories.filter((category) => categoryMatchesBook(category.path, knownWords));
+  const matchingCategories = book === null ? foundCategories : foundCategories.filter((category) => categoryMatchesBook(category.path, ownWords, book));
   const categories = rankCategories(matchingCategories, input.expectedDailySales);
   return {
     keywords: usable,

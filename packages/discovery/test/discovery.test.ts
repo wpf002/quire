@@ -6,8 +6,10 @@ import {
   SampleCategoryProvider,
   SampleMarketProvider,
   SampleSuggestionProvider,
+  bookTopics,
   bsrForDailySales,
   categoryFit,
+  categoryMatchesBook,
   demandScore,
   describesBook,
   keywordBoxText,
@@ -236,11 +238,33 @@ describe('niche filter', () => {
 
   it('keeps phrases whose extra topics appear in the manuscript', () => {
     const own = new Set(['cozy', 'bakery', 'mystery', 'proving', 'drawer']);
-    const book = new Set(['dough', 'oven', 'halloween', 'maggie']);
+    const book = bookTopics('dough oven halloween maggie');
     expect(describesBook('cozy mystery halloween', own, book)).toBe(true);
     expect(describesBook('cozy bakery mystery series', own, book)).toBe(true);
     expect(describesBook('cozy mysteries in egypt', own, book)).toBe(false);
     expect(describesBook('quilting cozy mystery series', own, book)).toBe(false);  });
+
+  it('ignores words a long manuscript only mentions in passing', () => {
+    const scenes = 'the inspector questioned the household again. '.repeat(3_000);
+    const own = new Set(['mystery']);
+    const passing = bookTopics(`${scenes} The kitchen was quiet.`);
+    expect(describesBook('mystery inspector', own, passing)).toBe(true);
+    expect(describesBook('mystery kitchen', own, passing)).toBe(false);
+    expect(categoryMatchesBook('Books › Cozy Culinary Mysteries', own, passing)).toBe(false);
+    expect(categoryMatchesBook('Books › Cozy Bookstores & Libraries Mysteries', own, passing)).toBe(false);
+    expect(categoryMatchesBook('Books › Private Investigator Mysteries', own, passing)).toBe(true);
+
+    const themed = bookTopics(`${scenes} ${'The kitchen was quiet. '.repeat(5)}`);
+    expect(categoryMatchesBook('Books › Cozy Culinary Mysteries', own, themed)).toBe(true);
+    expect(categoryMatchesBook('Books › Cozy Culinary Mysteries', new Set(['bakery']), passing)).toBe(true);
+  });
+
+  it('rejects suggestions for products other than a novel', () => {
+    for (const phrase of ['detective mystery word search', 'detective mystery box games', 'detective mystery kit', 'murder mystery audible', 'murder mystery for 9-12', 'murder mystery young adult', 'murder mysteries ya']) {
+      expect(isUsableKeyword(phrase)).toBe(false);
+    }
+    expect(isUsableKeyword('classic detective mystery')).toBe(true);
+  });
 
   it('treats series as a stop word after plural stemming', () => {
     expect([...nicheWords(['mystery series'], 'Mystery')]).toEqual([]);

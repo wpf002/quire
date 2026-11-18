@@ -72,7 +72,7 @@ const SUFFIXES = [' ', ...'abcdefghijklmnopqrstuvwxyz'.split('').map((letter) =>
 /** Longer suggestions are almost always book titles, not search phrases. */
 const MAX_KEYWORD_WORDS = 6;
 /** Suggestions that describe a different product than one paid book. */
-const OFF_PRODUCT_PATTERN = /\b(free|dvd|box(ed)? sets?|bundles?|mega set|book \d+|\d+-book|paperbacks?|prime reading|(kindle )?unlimited|top \d+)\b/;
+const OFF_PRODUCT_PATTERN = /\b(free|dvd|box(ed)? sets?|bundles?|mega set|book \d+|\d+-book|paperbacks?|prime reading|(kindle )?unlimited|top \d+|word search(es)?|puzzles?|games?|kits?|coloring|audiobooks?|audible|young adult|ya|for (kids|teens)|\d+-\d+)\b/;
 /** Autocomplete also returns store labels ("cozy mystery kindle+"). Search phrases hold only words. */
 const SEARCH_PHRASE_PATTERN = /^[\p{L}\p{N}\s'’&-]+$/u;
 
@@ -121,13 +121,30 @@ export function titleTags(titles: Iterable<string>): string[] {
 
 /** Lowercase words with a plain plural stripped, so "Mysteries" matches "mystery". */
 export function topicWords(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .split(/[^a-z]+/)
-      .filter((word) => word.length > 2)
-      .map((word) => word.replace(/ies$/, 'y').replace(/s$/, '')),
-  );
+  return new Set(stemmedWords(text));
+}
+
+function stemmedWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((word) => word.length > 2)
+    .map((word) => word.replace(/ies$/, 'y').replace(/s$/, ''));
+}
+
+/** A novel uses most common words in passing. A topic comes up at least once per this many words. */
+const WORDS_PER_TOPIC_MENTION = 5_000;
+
+export interface BookTopics {
+  mentions: Map<string, number>;
+  /** Mentions a word needs before the book counts as being about it. */
+  minMentions: number;
+}
+
+export function bookTopics(bookText: string): BookTopics {
+  const mentions = new Map<string, number>();
+  for (const word of stemmedWords(bookText)) mentions.set(word, (mentions.get(word) ?? 0) + 1);
+  return { mentions, minMentions: Math.max(1, Math.ceil(bookText.split(/\s+/).length / WORDS_PER_TOPIC_MENTION)) };
 }
 
 /** Words that appear in any seed but say nothing about the niche. */
@@ -144,11 +161,11 @@ const LISTING_WORDS = topicWords('series set collection box kindle ebook paperba
 
 /**
  * Autocomplete pairs a niche with topics the book may not have ("cozy mystery horses").
- * A phrase describes the book when each word beyond the book's own words and listing words appears in the manuscript.
+ * A phrase describes the book when each word beyond the book's own words and listing words is a topic of the manuscript.
  */
-export function describesBook(phrase: string, ownWords: Set<string>, bookWords: Set<string>): boolean {
+export function describesBook(phrase: string, ownWords: Set<string>, book: BookTopics): boolean {
   return [...topicWords(phrase)].every(
-    (word) => ownWords.has(word) || bookWords.has(word) || NICHE_STOP_WORDS.has(word) || LISTING_WORDS.has(word),
+    (word) => ownWords.has(word) || (book.mentions.get(word) ?? 0) >= book.minMentions || NICHE_STOP_WORDS.has(word) || LISTING_WORDS.has(word),
   );
 }
 
