@@ -9,5 +9,5 @@
     "lint": "eslint src test",
     "test": "vitest run"
   },
-  "dependencies": { "@quire/core": "workspace:*", "zod": "3.25.76" }
+  "dependencies": { "@quire/core": "workspace:*", "zod": "4.6.6" }
 }

@@ -9,6 +9,6 @@
     "lint": "eslint src test",
     "test": "vitest run"
   },
-  "dependencies": { "zod": "3.25.76" },
+  "dependencies": { "zod": "4.6.6" },
   "optionalDependencies": { "@flint/core": "link:../../../flint/packages/core" }
 }
